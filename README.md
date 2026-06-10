@@ -1,11 +1,4 @@
-**How to Deploy Locally**
-1. Create a new repository using the template.
-2. Clone the repository and open it locally.
-3. Open the Terminal and navigate to the `frontend` directory.
-4. Run the following:
-   ```
-   npm i
-   npm run dev
-   ```
+[![Netlify Status](https://api.netlify.com/api/v1/badges/9c6c401e-2422-4063-b538-e96c9472eb8c/deploy-status)](https://app.netlify.com/projects/collegehubhackathon/deploys)
 
-Just a simple template for designing websites, so that I can spend more time on what's important rather than the bare bones.
+**Work in Progress**
+Prompt: Create an AI College Matchmaker with the assistance of IBM Bob
