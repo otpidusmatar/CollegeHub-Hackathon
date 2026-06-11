@@ -22,8 +22,8 @@ export default function Dashboard() {
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="ms-auto">
               <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
-              <Nav.Link as={Link} to="/page1">Page 1</Nav.Link>
-              <Nav.Link as={Link} to="/page2">Page 2</Nav.Link>
+              <Nav.Link as={Link} to="/matchmaker">Matchmaker</Nav.Link>
+              <Nav.Link as={Link} to="/explore">Explore</Nav.Link>
               <Button 
                 variant="outline-light" 
                 size="sm" 
@@ -58,7 +58,7 @@ export default function Dashboard() {
               <div className="card-body">
                 <h5 className="card-title">Page 1</h5>
                 <p className="card-text">Explore Page 1 features and functionality.</p>
-                <Link to="/page1" className="btn btn-primary btn-sm">Go to Page 1</Link>
+                <Link to="/matchmaker" className="btn btn-primary btn-sm">Go to Page 1</Link>
               </div>
             </div>
           </div>
@@ -68,7 +68,7 @@ export default function Dashboard() {
               <div className="card-body">
                 <h5 className="card-title">Page 2</h5>
                 <p className="card-text">Discover what Page 2 has to offer.</p>
-                <Link to="/page2" className="btn btn-primary btn-sm">Go to Page 2</Link>
+                <Link to="/explore" className="btn btn-primary btn-sm">Go to Page 2</Link>
               </div>
             </div>
           </div>
