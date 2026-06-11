@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation, HashRouter as Router, Route, Routes, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { FavoritesProvider } from './context/FavoritesContext';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -65,9 +66,11 @@ function RouteContainer() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <RouteContainer />
-      </Router>
+      <FavoritesProvider>
+        <Router>
+          <RouteContainer />
+        </Router>
+      </FavoritesProvider>
     </AuthProvider>
   );
 }

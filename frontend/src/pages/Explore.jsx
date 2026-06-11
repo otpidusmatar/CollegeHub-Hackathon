@@ -16,10 +16,12 @@ import {
 } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
 
 export default function Explore() {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { toggleFavorite, isFavorite } = useFavorites();
   
   // State management
   const [colleges, setColleges] = useState([]);
@@ -345,17 +347,30 @@ export default function Explore() {
             <Row>
               {colleges.map((college, index) => (
                 <Col key={`${college.id}-${index}`} md={6} lg={4} className="mb-4">
-                  <Card 
-                    className="h-100 shadow-sm" 
+                  <Card
+                    className="h-100 shadow-sm"
                     style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                     onClick={() => openCollegeDetail(college)}
                   >
                     <Card.Body>
-                      <Card.Title className="mb-3" style={{ minHeight: '60px' }}>
-                        {college['school.name'] || 'Unknown College'}
-                      </Card.Title>
+                      <div className="d-flex justify-content-between align-items-start mb-3">
+                        <Card.Title className="mb-0" style={{ minHeight: '60px', flex: 1 }}>
+                          {college['school.name'] || 'Unknown College'}
+                        </Card.Title>
+                        <Button
+                          variant={isFavorite(college.id) ? "danger" : "outline-danger"}
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(college);
+                          }}
+                          title={isFavorite(college.id) ? "Remove from favorites" : "Add to favorites"}
+                        >
+                          <i className={`bi bi-heart${isFavorite(college.id) ? '-fill' : ''}`}></i>
+                        </Button>
+                      </div>
                       
                       <div className="mb-2">
                         <strong>📍 Location:</strong>
@@ -435,6 +450,18 @@ export default function Explore() {
         <Modal.Body>
           {selectedCollege && (
             <div>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h4 className="mb-0">College Details</h4>
+                <Button
+                  variant={isFavorite(selectedCollege.id) ? "danger" : "outline-danger"}
+                  size="sm"
+                  onClick={() => toggleFavorite(selectedCollege)}
+                  title={isFavorite(selectedCollege.id) ? "Remove from favorites" : "Add to favorites"}
+                >
+                  <i className={`bi bi-heart${isFavorite(selectedCollege.id) ? '-fill' : ''}`}></i>
+                  {isFavorite(selectedCollege.id) ? ' Remove from Favorites' : ' Add to Favorites'}
+                </Button>
+              </div>
               <Row className="mb-3">
                 <Col md={6}>
                   <h5>Location Information</h5>
