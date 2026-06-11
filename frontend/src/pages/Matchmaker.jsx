@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 
 export default function Matchmaker() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const { toggleFavorite, isFavorite } = useFavorites();
   
@@ -65,17 +65,25 @@ export default function Matchmaker() {
   const API_KEY = 'uZqhM5FIsMThqsWvIviu2aL8AR2EC0Hpc214b6KN';
   const BASE_URL = 'https://api.data.gov/ed/collegescorecard/v1/schools';
 
-  // Load saved questionnaires from localStorage
+  // Load saved questionnaires from localStorage (user-specific)
   useEffect(() => {
-    const saved = localStorage.getItem('collegeQuestionnaires');
-    if (saved) {
-      setSavedQuestionnaires(JSON.parse(saved));
+    if (user?.id) {
+      const storageKey = `collegeQuestionnaires_${user.id}`;
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        setSavedQuestionnaires(JSON.parse(saved));
+      } else {
+        setSavedQuestionnaires([]);
+      }
     }
-  }, []);
+  }, [user?.id]);
 
-  // Save questionnaires to localStorage
+  // Save questionnaires to localStorage (user-specific)
   const saveToLocalStorage = (questionnaires) => {
-    localStorage.setItem('collegeQuestionnaires', JSON.stringify(questionnaires));
+    if (user?.id) {
+      const storageKey = `collegeQuestionnaires_${user.id}`;
+      localStorage.setItem(storageKey, JSON.stringify(questionnaires));
+    }
   };
 
   // Handle logout
@@ -308,7 +316,15 @@ export default function Matchmaker() {
             <Form.Group className="mb-4">
               <Form.Label>Preferred States (Select all that apply)</Form.Label>
               <Row>
-                {['CA', 'NY', 'TX', 'FL', 'IL', 'PA', 'OH', 'MA', 'NC', 'GA', 'VA', 'MI'].map(state => (
+                {[
+                  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE',
+                  'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS',
+                  'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS',
+                  'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY',
+                  'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+                  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV',
+                  'WI', 'WY'
+                ].map(state => (
                   <Col md={3} key={state} className="mb-2">
                     <Form.Check
                       type="checkbox"

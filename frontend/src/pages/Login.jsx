@@ -2,14 +2,28 @@ import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.css';
 import { Container, Form, Button, Card, Alert } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+
+  const handleGoogleSuccess = (credentialResponse) => {
+    const result = loginWithGoogle(credentialResponse);
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setError(result.error || 'Failed to login with Google');
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError('Google login failed. Please try again.');
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -28,15 +42,14 @@ export default function Login() {
       return;
     }
 
-    // For demo purposes, accept any valid email/password combination
-    // In a real app, you would validate against a backend
-    const userData = {
-      email: email,
-      name: email.split('@')[0],
-    };
-
-    login(userData);
-    navigate('/dashboard');
+    // Validate credentials against stored users
+    const result = login(email, password);
+    
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setError(result.error);
+    }
   };
 
   return (
@@ -86,6 +99,28 @@ export default function Login() {
                     Log In
                   </Button>
                 </Form>
+
+                <div className="position-relative my-4">
+                  <hr />
+                  <span
+                    className="position-absolute top-50 start-50 translate-middle bg-white px-3 text-muted"
+                    style={{ fontSize: '0.9rem' }}
+                  >
+                    OR
+                  </span>
+                </div>
+
+                <div className="d-flex justify-content-center">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    useOneTap
+                    theme="outline"
+                    size="large"
+                    text="signin_with"
+                    shape="rectangular"
+                  />
+                </div>
 
                 <div className="text-center mt-4">
                   <p className="text-muted mb-0">

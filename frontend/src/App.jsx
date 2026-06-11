@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, HashRouter as Router, Route, Routes, Navigate } from "react-router-dom";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import Landing from './pages/Landing';
@@ -64,14 +65,18 @@ function RouteContainer() {
 }
 
 function App() {
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  
   return (
-    <AuthProvider>
-      <FavoritesProvider>
-        <Router>
-          <RouteContainer />
-        </Router>
-      </FavoritesProvider>
-    </AuthProvider>
+    <GoogleOAuthProvider clientId={clientId}>
+      <AuthProvider>
+        <FavoritesProvider>
+          <Router>
+            <RouteContainer />
+          </Router>
+        </FavoritesProvider>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   );
 }
 

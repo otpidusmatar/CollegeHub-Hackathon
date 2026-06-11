@@ -1,22 +1,40 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 const FavoritesContext = createContext(null);
 
 export const FavoritesProvider = ({ children }) => {
   const [favorites, setFavorites] = useState([]);
+  const { user, isAuthenticated } = useAuth();
 
-  // Load favorites from localStorage on mount
+  // Load favorites from localStorage when user changes
   useEffect(() => {
-    const storedFavorites = localStorage.getItem('collegeFavorites');
-    if (storedFavorites) {
-      setFavorites(JSON.parse(storedFavorites));
+    if (isAuthenticated && user?.id) {
+      const storageKey = `collegeFavorites_${user.id}`;
+      const storedFavorites = localStorage.getItem(storageKey);
+      if (storedFavorites) {
+        try {
+          setFavorites(JSON.parse(storedFavorites));
+        } catch (error) {
+          console.error('Error loading favorites:', error);
+          setFavorites([]);
+        }
+      } else {
+        setFavorites([]);
+      }
+    } else {
+      // Clear favorites when logged out
+      setFavorites([]);
     }
-  }, []);
+  }, [user?.id, isAuthenticated]);
 
-  // Save favorites to localStorage whenever they change
+  // Save favorites to localStorage whenever they change (user-specific)
   useEffect(() => {
-    localStorage.setItem('collegeFavorites', JSON.stringify(favorites));
-  }, [favorites]);
+    if (isAuthenticated && user?.id && favorites.length >= 0) {
+      const storageKey = `collegeFavorites_${user.id}`;
+      localStorage.setItem(storageKey, JSON.stringify(favorites));
+    }
+  }, [favorites, user?.id, isAuthenticated]);
 
   const addFavorite = (college) => {
     setFavorites(prev => {

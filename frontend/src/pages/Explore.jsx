@@ -14,6 +14,7 @@ import {
   Badge,
   InputGroup
 } from 'react-bootstrap';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
@@ -237,16 +238,56 @@ export default function Explore() {
                     onChange={handleFilterChange}
                   >
                     <option value="">All States</option>
+                    <option value="AL">Alabama</option>
+                    <option value="AK">Alaska</option>
+                    <option value="AZ">Arizona</option>
+                    <option value="AR">Arkansas</option>
                     <option value="CA">California</option>
-                    <option value="NY">New York</option>
-                    <option value="TX">Texas</option>
+                    <option value="CO">Colorado</option>
+                    <option value="CT">Connecticut</option>
+                    <option value="DE">Delaware</option>
                     <option value="FL">Florida</option>
-                    <option value="IL">Illinois</option>
-                    <option value="PA">Pennsylvania</option>
-                    <option value="OH">Ohio</option>
-                    <option value="MA">Massachusetts</option>
-                    <option value="NC">North Carolina</option>
                     <option value="GA">Georgia</option>
+                    <option value="HI">Hawaii</option>
+                    <option value="ID">Idaho</option>
+                    <option value="IL">Illinois</option>
+                    <option value="IN">Indiana</option>
+                    <option value="IA">Iowa</option>
+                    <option value="KS">Kansas</option>
+                    <option value="KY">Kentucky</option>
+                    <option value="LA">Louisiana</option>
+                    <option value="ME">Maine</option>
+                    <option value="MD">Maryland</option>
+                    <option value="MA">Massachusetts</option>
+                    <option value="MI">Michigan</option>
+                    <option value="MN">Minnesota</option>
+                    <option value="MS">Mississippi</option>
+                    <option value="MO">Missouri</option>
+                    <option value="MT">Montana</option>
+                    <option value="NE">Nebraska</option>
+                    <option value="NV">Nevada</option>
+                    <option value="NH">New Hampshire</option>
+                    <option value="NJ">New Jersey</option>
+                    <option value="NM">New Mexico</option>
+                    <option value="NY">New York</option>
+                    <option value="NC">North Carolina</option>
+                    <option value="ND">North Dakota</option>
+                    <option value="OH">Ohio</option>
+                    <option value="OK">Oklahoma</option>
+                    <option value="OR">Oregon</option>
+                    <option value="PA">Pennsylvania</option>
+                    <option value="RI">Rhode Island</option>
+                    <option value="SC">South Carolina</option>
+                    <option value="SD">South Dakota</option>
+                    <option value="TN">Tennessee</option>
+                    <option value="TX">Texas</option>
+                    <option value="UT">Utah</option>
+                    <option value="VT">Vermont</option>
+                    <option value="VA">Virginia</option>
+                    <option value="WA">Washington</option>
+                    <option value="WV">West Virginia</option>
+                    <option value="WI">Wisconsin</option>
+                    <option value="WY">Wyoming</option>
                   </Form.Control>
                 </Form.Group>
               </Col>
@@ -270,19 +311,6 @@ export default function Explore() {
                     <option value="7">Rocky Mountains</option>
                     <option value="8">Far West</option>
                   </Form.Control>
-                </Form.Group>
-              </Col>
-
-              <Col md={3} className="mb-3">
-                <Form.Group>
-                  <Form.Label>Min Tuition</Form.Label>
-                  <Form.Control
-                    type="number"
-                    name="minTuition"
-                    placeholder="$0"
-                    value={filters.minTuition}
-                    onChange={handleFilterChange}
-                  />
                 </Form.Group>
               </Col>
 
@@ -453,14 +481,21 @@ export default function Explore() {
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h4 className="mb-0">College Details</h4>
                 <Button
-                  variant={isFavorite(selectedCollege.id) ? "danger" : "outline-danger"}
-                  size="sm"
-                  onClick={() => toggleFavorite(selectedCollege)}
-                  title={isFavorite(selectedCollege.id) ? "Remove from favorites" : "Add to favorites"}
-                >
-                  <i className={`bi bi-heart${isFavorite(selectedCollege.id) ? '-fill' : ''}`}></i>
-                  {isFavorite(selectedCollege.id) ? ' Remove from Favorites' : ' Add to Favorites'}
-                </Button>
+                variant="link"
+                className="p-0 border-0"
+                onClick={() => toggleFavorite(selectedCollege)}
+                title={isFavorite(selectedCollege.id)
+                  ? "Remove from favorites"
+                  : "Add to favorites"}
+              >
+                <i
+                  className={`bi bi-heart${isFavorite(selectedCollege.id) ? '-fill' : ''}`}
+                  style={{
+                    fontSize: '1.8rem',
+                    color: isFavorite(selectedCollege.id) ? 'red' : '#666'
+                  }}
+                />
+              </Button>
               </div>
               <Row className="mb-3">
                 <Col md={6}>
