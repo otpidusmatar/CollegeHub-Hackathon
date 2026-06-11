@@ -1,24 +1,152 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import 'bootstrap/dist/css/bootstrap.css';
-import { 
-  Navbar, 
-  Nav, 
-  Container, 
-  Button, 
-  Form, 
-  Row, 
-  Col, 
-  Card, 
+import {
+  Navbar,
+  Nav,
+  Container,
+  Button,
+  Form,
+  Row,
+  Col,
+  Card,
   Modal,
   Accordion,
   Badge,
   Spinner,
   Alert,
-  ProgressBar
+  ProgressBar,
+  ListGroup,
+  InputGroup
 } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
+import aiService from '../services/aiService';
+
+// Helper function to format Gemini's markdown-style text
+const formatGeminiText = (text) => {
+  if (!text) return null;
+  
+  // Split text into parts while preserving formatting markers
+  const parts = [];
+  let currentIndex = 0;
+  
+  // Regular expressions for different formatting
+  const patterns = [
+    { regex: /\*\*\*(.+?)\*\*\*/g, tag: 'bold-italic' },  // ***text*** -> bold + italic
+    { regex: /\*\*(.+?)\*\*/g, tag: 'bold' },              // **text** -> bold
+    { regex: /\*(.+?)\*/g, tag: 'italic' },                // *text* -> italic
+    { regex: /`(.+?)`/g, tag: 'code' },                    // `text` -> code
+    { regex: /^#{1,6}\s+(.+)$/gm, tag: 'heading' },        // # text -> heading
+    { regex: /^\*\s+(.+)$/gm, tag: 'bullet' },             // * text -> bullet point
+    { regex: /^\d+\.\s+(.+)$/gm, tag: 'numbered' },        // 1. text -> numbered list
+  ];
+  
+  // Process the text line by line to handle block elements
+  const lines = text.split('\n');
+  
+  return lines.map((line, lineIndex) => {
+    // Check for headings
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const HeadingTag = `h${Math.min(level + 3, 6)}`; // h4-h6 for markdown h1-h3
+      return (
+        <HeadingTag key={lineIndex} style={{ marginTop: '0.5rem', marginBottom: '0.25rem', fontWeight: 'bold' }}>
+          {formatInlineText(headingMatch[2])}
+        </HeadingTag>
+      );
+    }
+    
+    // Check for bullet points
+    const bulletMatch = line.match(/^\*\s+(.+)$/);
+    if (bulletMatch) {
+      return (
+        <div key={lineIndex} style={{ marginLeft: '1rem', marginTop: '0.25rem' }}>
+          • {formatInlineText(bulletMatch[1])}
+        </div>
+      );
+    }
+    
+    // Check for numbered lists
+    const numberedMatch = line.match(/^(\d+)\.\s+(.+)$/);
+    if (numberedMatch) {
+      return (
+        <div key={lineIndex} style={{ marginLeft: '1rem', marginTop: '0.25rem' }}>
+          {numberedMatch[1]}. {formatInlineText(numberedMatch[2])}
+        </div>
+      );
+    }
+    
+    // Regular line with inline formatting
+    return (
+      <div key={lineIndex} style={{ marginTop: lineIndex > 0 ? '0.25rem' : 0 }}>
+        {formatInlineText(line)}
+      </div>
+    );
+  });
+};
+
+// Helper function to format inline text (bold, italic, code)
+const formatInlineText = (text) => {
+  if (!text) return null;
+  
+  const parts = [];
+  let lastIndex = 0;
+  let keyCounter = 0;
+  
+  // Combined regex to match all inline patterns
+  const combinedRegex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+  let match;
+  
+  while ((match = combinedRegex.exec(text)) !== null) {
+    // Add text before the match
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    
+    // Add formatted text
+    if (match[2]) {
+      // ***text*** -> bold + italic
+      parts.push(
+        <strong key={keyCounter++} style={{ fontStyle: 'italic' }}>
+          {match[2]}
+        </strong>
+      );
+    } else if (match[3]) {
+      // **text** -> bold
+      parts.push(<strong key={keyCounter++}>{match[3]}</strong>);
+    } else if (match[4]) {
+      // *text* -> italic
+      parts.push(<em key={keyCounter++}>{match[4]}</em>);
+    } else if (match[5]) {
+      // `text` -> code
+      parts.push(
+        <code
+          key={keyCounter++}
+          style={{
+            backgroundColor: '#f0f0f0',
+            padding: '0.125rem 0.25rem',
+            borderRadius: '0.25rem',
+            fontFamily: 'monospace',
+            fontSize: '0.9em'
+          }}
+        >
+          {match[5]}
+        </code>
+      );
+    }
+    
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : text;
+};
 
 export default function Matchmaker() {
   const { logout, user } = useAuth();
@@ -32,6 +160,15 @@ export default function Matchmaker() {
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  
+  // LLM Chat state
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [currentMessage, setCurrentMessage] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [savedChats, setSavedChats] = useState([]);
+  const [mentionedColleges, setMentionedColleges] = useState([]); // Store full college data with IDs and names
+  const chatEndRef = useRef(null);
   
   // Questionnaire responses
   const [responses, setResponses] = useState({
@@ -65,6 +202,9 @@ export default function Matchmaker() {
   const API_KEY = 'uZqhM5FIsMThqsWvIviu2aL8AR2EC0Hpc214b6KN';
   const BASE_URL = 'https://api.data.gov/ed/collegescorecard/v1/schools';
 
+  // AI Service (with Gemini/Groq fallback)
+  const isAIConfigured = aiService.isConfigured();
+
   // Load saved questionnaires from localStorage (user-specific)
   useEffect(() => {
     if (user?.id) {
@@ -75,14 +215,358 @@ export default function Matchmaker() {
       } else {
         setSavedQuestionnaires([]);
       }
+      
+      // Load saved chats
+      const chatStorageKey = `collegeChats_${user.id}`;
+      const savedChatsData = localStorage.getItem(chatStorageKey);
+      if (savedChatsData) {
+        setSavedChats(JSON.parse(savedChatsData));
+      } else {
+        setSavedChats([]);
+      }
     }
   }, [user?.id]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   // Save questionnaires to localStorage (user-specific)
   const saveToLocalStorage = (questionnaires) => {
     if (user?.id) {
       const storageKey = `collegeQuestionnaires_${user.id}`;
       localStorage.setItem(storageKey, JSON.stringify(questionnaires));
+    }
+  };
+
+  // Save chats to localStorage (user-specific)
+  const saveChatsToLocalStorage = (chats) => {
+    if (user?.id) {
+      const storageKey = `collegeChats_${user.id}`;
+      localStorage.setItem(storageKey, JSON.stringify(chats));
+    }
+  };
+
+  // Extract college names from text
+  // Validate and normalize college names using College Scorecard API
+  const validateCollegeName = async (potentialName) => {
+    try {
+      const params = new URLSearchParams({
+        api_key: API_KEY,
+        'school.name': potentialName,
+        'fields': 'id,school.name',
+        per_page: 5
+      });
+
+      const response = await fetch(`${BASE_URL}?${params}`);
+      const data = await response.json();
+      
+      if (data.results && data.results.length > 0) {
+        // Return the official College Scorecard name
+        return data.results[0]['school.name'];
+      }
+      return null;
+    } catch (error) {
+      console.error('Error validating college name:', error);
+      return null;
+    }
+  };
+
+  const extractCollegeNames = async (text) => {
+    try {
+      // Step 1: Pre-process text with regex to clean and normalize formatting
+      const cleanedText = text
+        // Remove markdown formatting
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/`/g, '')
+        // Normalize whitespace
+        .replace(/\s+/g, ' ')
+        // Remove extra punctuation around college names
+        .replace(/([,;:])\s*([A-Z])/g, '$1 $2')
+        // Normalize parentheses spacing
+        .replace(/\(\s+/g, '(')
+        .replace(/\s+\)/g, ')')
+        // Remove bullet points and list markers
+        .replace(/^[\s]*[-•*]\s+/gm, '')
+        .replace(/^\d+\.\s+/gm, '')
+        .trim();
+      
+      // Step 2: Use AI service to extract college names from the cleaned text
+      const extractionPrompt = `Analyze the following text and extract ALL college and university names mentioned.
+Return ONLY a valid JSON array of college names in the exact order they appear in the text.
+Include the full official name of each institution (e.g., "California Institute of Technology" not just "Caltech").
+If a college has a common abbreviation in parentheses like "California Institute of Technology (Caltech)", use the full name.
+
+Text to analyze:
+"""
+${cleanedText}
+"""
+
+Return format (JSON array only, no other text):
+["College Name 1", "College Name 2", ...]
+
+If no colleges are mentioned, return an empty array: []`;
+
+      const extractedText = await aiService.generateContent(extractionPrompt, { model: 'lite' });
+      
+      // Parse the JSON response
+      let collegeNames = [];
+      try {
+        // Remove markdown code blocks if present
+        const cleanedJsonText = extractedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        collegeNames = JSON.parse(cleanedJsonText);
+        
+        // Ensure it's an array
+        if (!Array.isArray(collegeNames)) {
+          console.warn('Gemini did not return an array, attempting to extract from object');
+          collegeNames = [];
+        }
+      } catch (parseError) {
+        console.error('Error parsing Gemini extraction response:', parseError);
+        console.log('Raw response:', extractedText);
+        collegeNames = [];
+      }
+      
+      // Remove duplicates while preserving order
+      const uniqueCollegeNames = [...new Set(collegeNames)];
+      
+      // Validate and fetch full college data for each extracted college name
+      const collegeDataResults = await Promise.all(
+        uniqueCollegeNames.map(async (name) => {
+          if (!name || typeof name !== 'string' || name.length < 3) {
+            return null;
+          }
+          
+          const validName = await validateCollegeName(name);
+          if (validName) {
+            // Fetch full college data immediately
+            return await searchCollege(validName);
+          }
+          return null;
+        })
+      );
+      
+      // Filter out null results while preserving order
+      return collegeDataResults.filter(college => college !== null);
+      
+    } catch (error) {
+      console.error('Error in AI-based college extraction:', error);
+      // Fallback: return empty array rather than crashing
+      return [];
+    }
+  };
+
+  // Start new chat
+  const startNewChat = () => {
+    if (!isAIConfigured) {
+      alert('AI service is not configured. Please add VITE_GEMINI_API_KEY or VITE_GROQ_API_KEY to your .env file.');
+      return;
+    }
+    setChatMessages([{
+      role: 'assistant',
+      content: "Hi! I'm your college advisor assistant. Tell me about your college preferences, interests, and goals, and I'll help you find the perfect colleges for you. What are you looking for in a college?"
+    }]);
+    setMentionedColleges([]);
+    setShowChat(true);
+  };
+
+  // Send message to AI service
+  const sendMessage = async () => {
+    if (!currentMessage.trim() || chatLoading) return;
+
+    const userMessage = currentMessage.trim();
+    setCurrentMessage('');
+    
+    // Add user message to chat
+    const updatedMessages = [...chatMessages, { role: 'user', content: userMessage }];
+    setChatMessages(updatedMessages);
+    setChatLoading(true);
+
+    try {
+      // Build conversation history for context
+      const history = updatedMessages.slice(0, -1);
+      
+      // Add system context to help with college recommendations
+      const prompt = `You are a helpful college advisor. The user is asking: "${userMessage}".
+      Please provide specific college recommendations when appropriate, mentioning college names clearly.
+      Focus on helping them find colleges that match their preferences, interests, and goals.`;
+      
+      const text = await aiService.chat(history, prompt);
+
+      // Extract college data from response BEFORE displaying the message
+      let collegeDataArray = [];
+      try {
+        collegeDataArray = await extractCollegeNames(text);
+
+        if (collegeDataArray.length > 0) {
+          setMentionedColleges(prev => {
+            const existingIds = new Set(prev.map(c => c.id));
+            const newColleges = collegeDataArray.filter(college => !existingIds.has(college.id));
+            return [...prev, ...newColleges];
+          });
+        }
+      } catch (error) {
+        console.error('Error extracting college data:', error);
+      }
+
+      // Add assistant response to chat AFTER college extraction completes
+      const finalMessages = [...updatedMessages, { role: 'assistant', content: text }];
+      setChatMessages(finalMessages);
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Check for specific API errors
+      let errorContent = 'Sorry, I encountered an error. Please try again.';
+      
+      // Check if it's a rate limit error
+      if (aiService.isRateLimitError(error)) {
+        const currentProvider = aiService.getCurrentProvider();
+        if (currentProvider === 'groq') {
+          errorContent = '⚠️ **API Rate Limit Reached**\n\n' +
+            'Both Gemini and Groq AI services have reached their rate limits.\n\n' +
+            '**What you can do:**\n' +
+            '• Wait a few minutes and try again\n' +
+            '• The system will automatically retry with available services\n\n' +
+            'We apologize for the inconvenience.';
+        } else {
+          errorContent = '🔄 **Switching to backup AI service...**\n\n' +
+            'The primary AI service encountered a rate limit. The system has automatically switched to a backup service.\n\n' +
+            'Please try sending your message again.';
+        }
+      }
+      // Check if it's a 503 error (high demand/overload)
+      else if (error.message && (
+        error.message.includes('503') ||
+        error.message.includes('high demand') ||
+        error.message.includes('currently experiencing')
+      )) {
+        errorContent = '🌐 The AI service is currently experiencing high demand and is temporarily overloaded. This is usually temporary during peak usage times. Please try again in a few moments.';
+      }
+      
+      const errorMessage = [...updatedMessages, {
+        role: 'assistant',
+        content: errorContent
+      }];
+      setChatMessages(errorMessage);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  // Save current chat
+  const saveCurrentChat = () => {
+    if (chatMessages.length === 0) {
+      alert('No messages to save');
+      return;
+    }
+
+    const chatName = prompt('Enter a name for this chat:');
+    if (!chatName || !chatName.trim()) return;
+
+    const newChat = {
+      id: Date.now(),
+      name: chatName.trim(),
+      date: new Date().toISOString(),
+      messages: chatMessages,
+      colleges: mentionedColleges // Now stores full college data objects
+    };
+
+    const updated = [newChat, ...savedChats];
+    setSavedChats(updated);
+    saveChatsToLocalStorage(updated);
+    
+    alert('Chat saved successfully!');
+  };
+
+  // Load saved chat
+  const loadChat = async (chat) => {
+    setChatMessages(chat.messages);
+    setShowChat(true);
+    
+    // If chat has stored colleges, use them
+    if (chat.colleges && chat.colleges.length > 0) {
+      setMentionedColleges(chat.colleges);
+    } else {
+      // For older chats without stored colleges, re-extract from all assistant messages
+      setMentionedColleges([]);
+      
+      // Extract colleges from all assistant messages
+      const allColleges = [];
+      for (const message of chat.messages) {
+        if (message.role === 'assistant') {
+          try {
+            const collegeDataArray = await extractCollegeNames(message.content);
+            if (collegeDataArray.length > 0) {
+              // Add new colleges, avoiding duplicates
+              collegeDataArray.forEach(college => {
+                if (!allColleges.find(c => c.id === college.id)) {
+                  allColleges.push(college);
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Error extracting colleges from message:', error);
+          }
+        }
+      }
+      
+      setMentionedColleges(allColleges);
+      
+      // Update the saved chat with extracted colleges for future loads
+      if (allColleges.length > 0) {
+        const updatedChat = { ...chat, colleges: allColleges };
+        const updatedChats = savedChats.map(c => c.id === chat.id ? updatedChat : c);
+        setSavedChats(updatedChats);
+        saveChatsToLocalStorage(updatedChats);
+      }
+    }
+  };
+
+  // Delete chat
+  const deleteChat = (id) => {
+    if (window.confirm('Are you sure you want to delete this chat?')) {
+      const updated = savedChats.filter(c => c.id !== id);
+      setSavedChats(updated);
+      saveChatsToLocalStorage(updated);
+    }
+  };
+
+  // Search for college in College Scorecard API
+  const searchCollege = async (collegeName) => {
+    try {
+      // Since mentionedColleges now contains exact College Scorecard names,
+      // we can search with exact match for better results
+      const params = new URLSearchParams({
+        api_key: API_KEY,
+        'school.name': collegeName,
+        'fields': 'id,school.name,school.city,school.state,school.school_url,latest.cost.tuition.in_state,latest.student.size,latest.admissions.admission_rate.overall,school.ownership',
+        per_page: 5 // Get top 5 to find exact match
+      });
+
+      const response = await fetch(`${BASE_URL}?${params}`);
+      const data = await response.json();
+      
+      if (data.results && data.results.length > 0) {
+        // Try to find exact match first
+        const exactMatch = data.results.find(
+          college => college['school.name'].toLowerCase() === collegeName.toLowerCase()
+        );
+        return exactMatch || data.results[0];
+      }
+      return null;
+    } catch (error) {
+      console.error('Error searching college:', error);
+      return null;
+    }
+  };
+
+  // Handle college favorite from sidebar
+  const handleCollegeFavorite = (collegeData) => {
+    if (collegeData) {
+      toggleFavorite(collegeData);
     }
   };
 
@@ -557,19 +1041,30 @@ export default function Matchmaker() {
           Find your perfect college match by answering a few questions about your preferences.
         </p>
 
-        {/* Start New Questionnaire Button */}
+        {/* Start New Questionnaire and Chat Buttons */}
         <Card className="mb-4 shadow-sm">
           <Card.Body className="text-center py-4">
             <h4 className="mb-3">Ready to find your perfect college?</h4>
-            <Button 
-              variant="primary" 
-              size="lg"
-              onClick={startNewQuestionnaire}
-              disabled={showQuestionnaire}
-            >
-              <i className="bi bi-plus-circle me-2"></i>
-              Start New Questionnaire
-            </Button>
+            <div className="d-flex gap-3 justify-content-center flex-wrap">
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={startNewQuestionnaire}
+                disabled={showQuestionnaire}
+              >
+                <i className="bi bi-list-check me-2"></i>
+                Start Questionnaire
+              </Button>
+              <Button
+                variant="success"
+                size="lg"
+                onClick={startNewChat}
+                disabled={showChat}
+              >
+                <i className="bi bi-chat-dots me-2"></i>
+                Chat with AI Advisor
+              </Button>
+            </div>
           </Card.Body>
         </Card>
 
@@ -718,9 +1213,249 @@ export default function Matchmaker() {
           </Modal.Footer>
         </Modal>
 
-        {/* Saved Questionnaires */}
+        {/* Chat Modal */}
+        <Modal
+          show={showChat}
+          onHide={() => setShowChat(false)}
+          size="xl"
+          backdrop="static"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>AI College Advisor Chat</Modal.Title>
+          </Modal.Header>
+          <Modal.Body style={{ height: '70vh', display: 'flex', flexDirection: 'row', gap: '1rem' }}>
+            {/* Chat Area */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              {/* Messages */}
+              <div style={{
+                flex: 1,
+                overflowY: 'auto',
+                border: '1px solid #dee2e6',
+                borderRadius: '0.375rem',
+                padding: '1rem',
+                marginBottom: '1rem',
+                backgroundColor: '#f8f9fa'
+              }}>
+                {chatMessages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`mb-3 ${message.role === 'user' ? 'text-end' : ''}`}
+                  >
+                    <div
+                      style={{
+                        display: 'inline-block',
+                        maxWidth: '80%',
+                        padding: '0.75rem 1rem',
+                        borderRadius: '1rem',
+                        backgroundColor: message.role === 'user' ? '#0d6efd' : '#ffffff',
+                        color: message.role === 'user' ? '#ffffff' : '#000000',
+                        textAlign: 'left',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                      }}
+                    >
+                      <strong>{message.role === 'user' ? 'You' : 'AI Advisor'}:</strong>
+                      <div style={{ marginTop: '0.5rem' }}>
+                        {message.role === 'user' ? (
+                          <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+                        ) : (
+                          formatGeminiText(message.content)
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="text-center">
+                    <Spinner animation="border" size="sm" />
+                    <span className="ms-2">AI is thinking...</span>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Input Area */}
+              <InputGroup>
+                <Form.Control
+                  as="textarea"
+                  rows={2}
+                  placeholder="Ask about colleges, programs, locations, or any preferences..."
+                  value={currentMessage}
+                  onChange={(e) => setCurrentMessage(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  disabled={chatLoading}
+                />
+                <Button
+                  variant="primary"
+                  onClick={sendMessage}
+                  disabled={chatLoading || !currentMessage.trim()}
+                >
+                  <i className="bi bi-send"></i> Send
+                </Button>
+              </InputGroup>
+            </div>
+
+            {/* College Sidebar */}
+            {mentionedColleges.length > 0 && (
+              <div
+                style={{
+                  width: '300px',
+                  borderLeft: '1px solid #dee2e6',
+                  paddingLeft: '1rem',
+                  overflowY: 'auto'
+                }}
+              >
+                <h5 className="mb-3">
+                  <i className="bi bi-building me-2"></i>
+                  Mentioned Colleges
+                </h5>
+
+                <ListGroup>
+                  {mentionedColleges.map((collegeData, index) => {
+                    const isCollegeFavorited = isFavorite(collegeData.id);
+
+                    return (
+                      <ListGroup.Item
+                        key={collegeData.id || index}
+                        className="d-flex justify-content-between align-items-center"
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                            {collegeData['school.name']}
+                          </div>
+                          <small className="text-muted">
+                            {collegeData['school.city']}, {collegeData['school.state']}
+                          </small>
+                        </div>
+
+                        <Button
+                          variant={isCollegeFavorited ? "danger" : "outline-danger"}
+                          size="sm"
+                          onClick={() => handleCollegeFavorite(collegeData)}
+                          title={isCollegeFavorited ? "Remove from favorites" : "Add to favorites"}
+                        >
+                          <i
+                            className={
+                              isCollegeFavorited
+                                ? "bi bi-heart-fill"
+                                : "bi bi-heart"
+                            }
+                          />
+                        </Button>
+                      </ListGroup.Item>
+                    );
+                  })}
+                </ListGroup>
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="info" onClick={saveCurrentChat}>
+              <i className="bi bi-save me-2"></i>
+              Save Chat
+            </Button>
+            <Button variant="secondary" onClick={() => setShowChat(false)}>
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* Saved Questionnaires and Chats */}
         <div className="mt-5">
-          <h3 className="mb-3">Your Saved Questionnaires</h3>
+          <h3 className="mb-3">Your History</h3>
+          
+          {/* Saved Chats Section */}
+          {savedChats.length > 0 && (
+            <div className="mb-4">
+              <h4 className="mb-3">
+                <i className="bi bi-chat-dots me-2"></i>
+                Saved AI Chats
+              </h4>
+              <Accordion>
+                {savedChats.map((chat, index) => (
+                  <Accordion.Item eventKey={`chat-${index}`} key={chat.id}>
+                    <Accordion.Header>
+                      <div className="d-flex justify-content-between align-items-center w-100 me-3">
+                        <div>
+                          <Badge bg="success" className="me-2">Chat</Badge>
+                          <strong>{chat.name}</strong>
+                          <br />
+                          <small className="text-muted">
+                            {new Date(chat.date).toLocaleDateString()} • {chat.messages.length} messages
+                            {chat.colleges && chat.colleges.length > 0 && ` • ${chat.colleges.length} colleges mentioned`}
+                          </small>
+                        </div>
+                      </div>
+                    </Accordion.Header>
+                    <Accordion.Body>
+                      <Row>
+                        <Col md={8}>
+                          <h5>Chat Preview:</h5>
+                          <div style={{
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            backgroundColor: '#f8f9fa',
+                            padding: '1rem',
+                            borderRadius: '0.375rem'
+                          }}>
+                            {chat.messages.slice(0, 4).map((msg, idx) => (
+                              <div key={idx} className="mb-2">
+                                <strong>{msg.role === 'user' ? 'You' : 'AI'}:</strong>
+                                <div style={{ fontSize: '0.9rem' }}>
+                                  {msg.content.substring(0, 150)}
+                                  {msg.content.length > 150 ? '...' : ''}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {chat.colleges && chat.colleges.length > 0 && (
+                            <div className="mt-3">
+                              <strong>Colleges Mentioned:</strong>
+                              <div className="mt-2">
+                                {chat.colleges.map((college, idx) => (
+                                  <Badge key={idx} bg="secondary" className="me-2 mb-2">
+                                    {typeof college === 'string' ? college : college['school.name']}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </Col>
+                        <Col md={4} className="text-end">
+                          <Button
+                            variant="success"
+                            className="mb-2 w-100"
+                            onClick={() => loadChat(chat)}
+                          >
+                            <i className="bi bi-chat-dots me-2"></i>
+                            Open Chat
+                          </Button>
+                          <Button
+                            variant="danger"
+                            className="w-100"
+                            onClick={() => deleteChat(chat.id)}
+                          >
+                            <i className="bi bi-trash me-2"></i>
+                            Delete
+                          </Button>
+                        </Col>
+                      </Row>
+                    </Accordion.Body>
+                  </Accordion.Item>
+                ))}
+              </Accordion>
+            </div>
+          )}
+
+          {/* Saved Questionnaires Section */}
+          <h4 className="mb-3">
+            <i className="bi bi-list-check me-2"></i>
+            Saved Questionnaires
+          </h4>
           {savedQuestionnaires.length === 0 ? (
             <Alert variant="info">
               You haven't completed any questionnaires yet. Start one above to get personalized college recommendations!

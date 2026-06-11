@@ -88,7 +88,7 @@ export default function Dashboard() {
             </Row>
 
             {/* Favorites Section */}
-            <div className="mt-4">
+            <div className="mt-4 pb-4">
               <h3 className="mb-3">
                 ❤️ My Favorite Colleges
                 <Badge bg="secondary" className="ms-2">{favorites.length}</Badge>
