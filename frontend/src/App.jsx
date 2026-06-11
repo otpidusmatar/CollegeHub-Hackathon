@@ -5,8 +5,8 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
-import Page1 from './pages/Page1';
-import Page2 from './pages/Page2';
+import Matchmaker from './pages/Matchmaker';
+import Explore from './pages/Explore';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -48,14 +48,14 @@ function RouteContainer() {
           <Dashboard />
         </ProtectedRoute>
       } />
-      <Route path="/page1" element={
+      <Route path="/matchmaker" element={
         <ProtectedRoute>
-          <Page1 />
+          <Matchmaker />
         </ProtectedRoute>
       } />
-      <Route path="/page2" element={
+      <Route path="/explore" element={
         <ProtectedRoute>
-          <Page2 />
+          <Explore />
         </ProtectedRoute>
       } />
     </Routes>

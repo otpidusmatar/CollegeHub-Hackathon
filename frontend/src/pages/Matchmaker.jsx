@@ -4,7 +4,7 @@ import { Navbar, Nav, Container, Button } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function Page1() {
+export default function Matchmaker() {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -22,8 +22,8 @@ export default function Page1() {
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="ms-auto">
               <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
-              <Nav.Link as={Link} to="/page1">Page 1</Nav.Link>
-              <Nav.Link as={Link} to="/page2">Page 2</Nav.Link>
+              <Nav.Link as={Link} to="/matchmaker">Matchmaker</Nav.Link>
+              <Nav.Link as={Link} to="/explore">Explore</Nav.Link>
               <Button
                 variant="outline-light"
                 size="sm"
