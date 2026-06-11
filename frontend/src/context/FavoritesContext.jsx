@@ -43,7 +43,8 @@ export const FavoritesProvider = ({ children }) => {
       if (exists) {
         return prev;
       }
-      return [...prev, college];
+      // Add college with applied status set to false
+      return [...prev, { ...college, applied: false }];
     });
   };
 
@@ -63,13 +64,29 @@ export const FavoritesProvider = ({ children }) => {
     }
   };
 
+  const toggleApplied = (collegeId) => {
+    setFavorites(prev =>
+      prev.map(fav =>
+        fav.id === collegeId
+          ? { ...fav, applied: !fav.applied }
+          : fav
+      )
+    );
+  };
+
+  const getAppliedCount = () => {
+    return favorites.filter(fav => fav.applied).length;
+  };
+
   return (
-    <FavoritesContext.Provider value={{ 
-      favorites, 
-      addFavorite, 
-      removeFavorite, 
-      isFavorite, 
-      toggleFavorite 
+    <FavoritesContext.Provider value={{
+      favorites,
+      addFavorite,
+      removeFavorite,
+      isFavorite,
+      toggleFavorite,
+      toggleApplied,
+      getAppliedCount
     }}>
       {children}
     </FavoritesContext.Provider>
