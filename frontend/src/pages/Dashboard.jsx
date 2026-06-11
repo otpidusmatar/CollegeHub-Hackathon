@@ -1,16 +1,35 @@
 import React from 'react';
 import 'bootstrap/dist/css/bootstrap.css';
-import { Navbar, Nav, Container, Button } from 'react-bootstrap';
+import { Navbar, Nav, Container, Button, Card, Row, Col, Badge, ListGroup, Alert } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { favorites, removeFavorite } = useFavorites();
 
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    if (!amount) return 'N/A';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  // Format number
+  const formatNumber = (num) => {
+    if (!num) return 'N/A';
+    return new Intl.NumberFormat('en-US').format(num);
   };
 
   return (
@@ -43,36 +62,126 @@ export default function Dashboard() {
           <p className="text-muted">Email: {user?.email}</p>
         </div>
         
-        <div className="row mt-4">
-          <div className="col-md-4 mb-3">
-            <div className="card shadow-sm">
-              <div className="card-body">
-                <h5 className="card-title">Quick Access</h5>
-                <p className="card-text">Navigate to different sections of CollegeHub using the navigation bar above.</p>
-              </div>
+        <Row className="mt-4">
+          <Col md={8}>
+            <h3 className="mb-3">Quick Actions</h3>
+            <Row>
+              <Col md={6} className="mb-3">
+                <Card className="shadow-sm h-100">
+                  <Card.Body>
+                    <Card.Title>🎯 Matchmaker</Card.Title>
+                    <Card.Text>Find your perfect college match by answering a few questions about your preferences.</Card.Text>
+                    <Link to="/matchmaker" className="btn btn-primary btn-sm">Start Matchmaker</Link>
+                  </Card.Body>
+                </Card>
+              </Col>
+              
+              <Col md={6} className="mb-3">
+                <Card className="shadow-sm h-100">
+                  <Card.Body>
+                    <Card.Title>🔍 Explore Colleges</Card.Title>
+                    <Card.Text>Browse and search through thousands of colleges with advanced filters.</Card.Text>
+                    <Link to="/explore" className="btn btn-primary btn-sm">Explore Now</Link>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+
+            {/* Favorites Section */}
+            <div className="mt-4">
+              <h3 className="mb-3">
+                ❤️ My Favorite Colleges
+                <Badge bg="secondary" className="ms-2">{favorites.length}</Badge>
+              </h3>
+              
+              {favorites.length === 0 ? (
+                <Alert variant="info">
+                  <Alert.Heading>No favorites yet!</Alert.Heading>
+                  <p className="mb-0">
+                    Start adding colleges to your favorites from the Matchmaker or Explore pages by clicking the heart icon on any college card.
+                  </p>
+                </Alert>
+              ) : (
+                <Card className="shadow-sm">
+                  <ListGroup variant="flush">
+                    {favorites.map((college) => (
+                      <ListGroup.Item key={college.id} className="py-3">
+                        <Row className="align-items-center">
+                          <Col md={8}>
+                            <h5 className="mb-2">{college['school.name']}</h5>
+                            <div className="text-muted small">
+                              <div>📍 {college['school.city']}, {college['school.state']}</div>
+                              <div>💰 In-State Tuition: {formatCurrency(college['latest.cost.tuition.in_state'])}</div>
+                              <div>👥 Students: {formatNumber(college['latest.student.size'])}</div>
+                              {college['latest.admissions.admission_rate.overall'] && (
+                                <div>
+                                  📊 Acceptance Rate: {(college['latest.admissions.admission_rate.overall'] * 100).toFixed(1)}%
+                                </div>
+                              )}
+                            </div>
+                          </Col>
+                          <Col md={4} className="text-end">
+                            {college['school.school_url'] && (
+                              <a
+                                href={college['school.school_url'].startsWith('http')
+                                  ? college['school.school_url']
+                                  : `https://${college['school.school_url']}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-sm btn-outline-primary me-2 mb-2"
+                              >
+                                Visit Website
+                              </a>
+                            )}
+                            <Button
+                              variant="outline-danger"
+                              size="sm"
+                              onClick={() => removeFavorite(college.id)}
+                              title="Remove from favorites"
+                              className="mb-2"
+                            >
+                              <i className="bi bi-trash"></i> Remove
+                            </Button>
+                          </Col>
+                        </Row>
+                      </ListGroup.Item>
+                    ))}
+                  </ListGroup>
+                </Card>
+              )}
             </div>
-          </div>
-          
-          <div className="col-md-4 mb-3">
-            <div className="card shadow-sm">
-              <div className="card-body">
-                <h5 className="card-title">Page 1</h5>
-                <p className="card-text">Explore Page 1 features and functionality.</p>
-                <Link to="/matchmaker" className="btn btn-primary btn-sm">Go to Page 1</Link>
-              </div>
-            </div>
-          </div>
-          
-          <div className="col-md-4 mb-3">
-            <div className="card shadow-sm">
-              <div className="card-body">
-                <h5 className="card-title">Page 2</h5>
-                <p className="card-text">Discover what Page 2 has to offer.</p>
-                <Link to="/explore" className="btn btn-primary btn-sm">Go to Page 2</Link>
-              </div>
-            </div>
-          </div>
-        </div>
+          </Col>
+
+          <Col md={4}>
+            <Card className="shadow-sm">
+              <Card.Body>
+                <Card.Title>📊 Your Stats</Card.Title>
+                <ListGroup variant="flush" className="mt-3">
+                  <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                    <span>Favorite Colleges</span>
+                    <Badge bg="primary" pill>{favorites.length}</Badge>
+                  </ListGroup.Item>
+                  <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                    <span>Account Status</span>
+                    <Badge bg="success" pill>Active</Badge>
+                  </ListGroup.Item>
+                </ListGroup>
+              </Card.Body>
+            </Card>
+
+            <Card className="shadow-sm mt-3">
+              <Card.Body>
+                <Card.Title>💡 Quick Tips</Card.Title>
+                <ul className="small mb-0">
+                  <li>Use the Matchmaker to find colleges that fit your preferences</li>
+                  <li>Save colleges to your favorites for easy access</li>
+                  <li>Explore colleges with advanced search filters</li>
+                  <li>Visit college websites to learn more</li>
+                </ul>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
       </Container>
     </>
   );
