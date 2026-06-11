@@ -41,7 +41,7 @@ export default function Explore() {
   const [hasMore, setHasMore] = useState(true);
 
   // College Scorecard API configuration
-  const API_KEY = 'uZqhM5FIsMThqsWvIviu2aL8AR2EC0Hpc214b6KN'; // Replace with actual API key
+  const API_KEY = import.meta.env.VITE_COLLEGE_API_KEY; // Replace with actual API key
   const BASE_URL = 'https://api.data.gov/ed/collegescorecard/v1/schools';
 
   // Fetch colleges from API
