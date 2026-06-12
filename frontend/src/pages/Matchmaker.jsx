@@ -24,6 +24,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import aiService from '../services/aiService';
+import ProfileDropdown from '../components/ProfileDropdown';
 
 // US States for multiselect dropdown
 const US_STATES = [
@@ -205,7 +206,7 @@ const formatInlineText = (text) => {
 };
 
 export default function Matchmaker() {
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toggleFavorite, isFavorite } = useFavorites();
   
@@ -646,10 +647,6 @@ If no colleges are mentioned, return an empty array: []`;
   };
 
   // Handle logout
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
 
   // Start new questionnaire
   const startNewQuestionnaire = () => {
@@ -1371,18 +1368,14 @@ ${colleges.slice(0, 50).map(c => c['school.name']).join('\n')}`;
           <Navbar.Brand as={Link} to="/dashboard">CollegeHub</Navbar.Brand>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
-            <Nav className="ms-auto">
+            <Nav className="ms-auto align-items-center">
               <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
               <Nav.Link as={Link} to="/matchmaker" style={{ color: '#ffffff' }}>Matchmaker</Nav.Link>
               <Nav.Link as={Link} to="/explore">Explore</Nav.Link>
-              <Button
-                variant="outline-light"
-                size="sm"
-                onClick={handleLogout}
-                className="ms-2"
-              >
-                Logout
-              </Button>
+              <Nav.Link as={Link} to="/analyzer">Analysis</Nav.Link>
+              <div className="ms-2">
+                <ProfileDropdown />
+              </div>
             </Nav>
           </Navbar.Collapse>
         </Container>

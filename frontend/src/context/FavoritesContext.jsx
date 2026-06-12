@@ -43,8 +43,8 @@ export const FavoritesProvider = ({ children }) => {
       if (exists) {
         return prev;
       }
-      // Add college with applied status set to false
-      return [...prev, { ...college, applied: false }];
+      // Add college with applied status set to false and timestamp
+      return [...prev, { ...college, applied: false, addedAt: Date.now() }];
     });
   };
 

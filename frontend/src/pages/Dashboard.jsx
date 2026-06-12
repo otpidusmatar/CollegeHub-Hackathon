@@ -4,19 +4,16 @@ import { Navbar, Nav, Container, Button, Card, Row, Col, Badge, ListGroup, Alert
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
+import { useProfile } from '../context/ProfileContext';
+import ProfileDropdown from '../components/ProfileDropdown';
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { favorites, removeFavorite, toggleApplied, getAppliedCount } = useFavorites();
-  const [showAnalysisMode, setShowAnalysisMode] = useState(false);
+  const { getProfileCompleteness } = useProfile();
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -80,6 +77,13 @@ export default function Dashboard() {
             ? aValue.localeCompare(bValue)
             : bValue.localeCompare(aValue);
         
+        case 'timeAdded':
+          // Assuming favorites are stored in order added (newer at end)
+          // We'll use the array index as a proxy for time added
+          aValue = favorites.indexOf(a);
+          bValue = favorites.indexOf(b);
+          return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+        
         default:
           return 0;
       }
@@ -88,7 +92,8 @@ export default function Dashboard() {
     return sorted;
   };
 
-  const displayedFavorites = showAnalysisMode ? getSortedFavorites() : favorites;
+  const displayedFavorites = getSortedFavorites();
+  const profileCompleteness = getProfileCompleteness();
 
   return (
     <>
@@ -97,18 +102,14 @@ export default function Dashboard() {
           <Navbar.Brand as={Link} to="/dashboard">CollegeHub</Navbar.Brand>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
-            <Nav className="ms-auto">
+            <Nav className="ms-auto align-items-center">
               <Nav.Link as={Link} to="/dashboard" style={{ color: '#ffffff' }}>Dashboard</Nav.Link>
               <Nav.Link as={Link} to="/matchmaker">Matchmaker</Nav.Link>
               <Nav.Link as={Link} to="/explore">Explore</Nav.Link>
-              <Button 
-                variant="outline-light" 
-                size="sm" 
-                onClick={handleLogout}
-                className="ms-2"
-              >
-                Logout
-              </Button>
+              <Nav.Link as={Link} to="/analyzer">Analysis</Nav.Link>
+              <div className="ms-2">
+                <ProfileDropdown />
+              </div>
             </Nav>
           </Navbar.Collapse>
         </Container>
@@ -152,19 +153,10 @@ export default function Dashboard() {
                   ❤️ My Favorite Colleges
                   <Badge bg="secondary" className="ms-2">{favorites.length}</Badge>
                 </h3>
-                {showAnalysisMode && favorites.length > 0 && (
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => setShowAnalysisMode(false)}
-                  >
-                    Exit Analysis Mode
-                  </Button>
-                )}
               </div>
               
-              {/* Analysis Mode Controls */}
-              {showAnalysisMode && favorites.length > 0 && (
+              {/* Sorting Controls - Always Available */}
+              {favorites.length > 0 && (
                 <Card className="shadow-sm mb-3 bg-light">
                   <Card.Body>
                     <Row className="align-items-center">
@@ -181,6 +173,7 @@ export default function Dashboard() {
                             <option value="acceptance">Acceptance Rate</option>
                             <option value="size">Class Size</option>
                             <option value="location">Location</option>
+                            <option value="timeAdded">Time Added</option>
                           </Form.Select>
                         </Form.Group>
                       </Col>
@@ -193,10 +186,10 @@ export default function Dashboard() {
                             onChange={(e) => setSortOrder(e.target.value)}
                           >
                             <option value="asc">
-                              {sortBy === 'name' || sortBy === 'location' ? 'A to Z' : 'Low to High'}
+                              {sortBy === 'name' || sortBy === 'location' ? 'A to Z' : sortBy === 'timeAdded' ? 'Oldest First' : 'Low to High'}
                             </option>
                             <option value="desc">
-                              {sortBy === 'name' || sortBy === 'location' ? 'Z to A' : 'High to Low'}
+                              {sortBy === 'name' || sortBy === 'location' ? 'Z to A' : sortBy === 'timeAdded' ? 'Newest First' : 'High to Low'}
                             </option>
                           </Form.Select>
                         </Form.Group>
@@ -294,7 +287,7 @@ export default function Dashboard() {
             </div>
           </Col>
 
-          <Col md={4}>
+          <Col md={4} className="mb-5 pb-4">
             <Card className="shadow-sm">
               <Card.Body>
                 <Card.Title>📊 Your Stats</Card.Title>
@@ -359,22 +352,42 @@ export default function Dashboard() {
 
             <Card className="shadow-sm mt-3">
               <Card.Body>
-                <Card.Title>📈 Favorite College Analysis</Card.Title>
+                <Card.Title>🎓 Personal Analytics</Card.Title>
                 <Card.Text className="small text-muted">
-                  Compare and analyze your favorite colleges by sorting them based on different criteria.
+                  Build your academic portfolio and evaluate your competitiveness at your favorite colleges with AI-powered analysis.
                 </Card.Text>
-                {favorites.length > 0 ? (
-                  <Button
-                    variant={showAnalysisMode ? "success" : "primary"}
-                    size="sm"
-                    className="w-100"
-                    onClick={() => setShowAnalysisMode(!showAnalysisMode)}
+                
+                <div className="mb-3">
+                  <div className="d-flex justify-content-between mb-2">
+                    <span className="small fw-bold">Profile Completeness</span>
+                    <span className="small text-muted">{profileCompleteness}%</span>
+                  </div>
+                  <ProgressBar
+                    now={profileCompleteness}
+                    variant={profileCompleteness === 100 ? 'success' : profileCompleteness >= 50 ? 'info' : 'warning'}
+                    style={{ height: '8px' }}
+                  />
+                </div>
+
+                <div className="d-grid gap-2">
+                  <Link to="/profile" className="btn btn-outline-primary btn-sm">
+                    📚 Build Portfolio
+                  </Link>
+                  <Link
+                    to="/analyzer"
+                    className="btn btn-primary btn-sm"
+                    style={{
+                      opacity: profileCompleteness < 50 ? 0.6 : 1,
+                      pointerEvents: profileCompleteness < 50 ? 'none' : 'auto'
+                    }}
                   >
-                    {showAnalysisMode ? '✓ Analysis Mode Active' : 'Enter Analysis Mode'}
-                  </Button>
-                ) : (
-                  <Alert variant="light" className="small mb-0 mt-2">
-                    Add colleges to your favorites to use analysis mode.
+                    🎯 Analyze Competitiveness
+                  </Link>
+                </div>
+
+                {profileCompleteness < 50 && (
+                  <Alert variant="light" className="small mt-3 mb-0">
+                    Complete at least 50% of your profile to use the competitiveness analyzer.
                   </Alert>
                 )}
               </Card.Body>
@@ -386,8 +399,8 @@ export default function Dashboard() {
                 <ul className="small mb-0">
                   <li>Use the Matchmaker to find colleges that fit your preferences</li>
                   <li>Save colleges to your favorites for easy access</li>
-                  <li>Explore colleges with advanced search filters</li>
-                  <li>Visit college websites to learn more</li>
+                  <li>Build your academic portfolio to track achievements</li>
+                  <li>Analyze your competitiveness with AI insights</li>
                 </ul>
               </Card.Body>
             </Card>

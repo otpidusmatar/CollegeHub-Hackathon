@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.css';
-import { 
-  Navbar, 
-  Nav, 
-  Container, 
-  Button, 
-  Form, 
-  Row, 
-  Col, 
-  Card, 
-  Modal, 
+import {
+  Navbar,
+  Nav,
+  Container,
+  Button,
+  Form,
+  Row,
+  Col,
+  Card,
+  Modal,
   Spinner,
   Badge,
   InputGroup
@@ -18,9 +18,9 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
+import ProfileDropdown from '../components/ProfileDropdown';
 
 export default function Explore() {
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const { toggleFavorite, isFavorite } = useFavorites();
   
@@ -188,18 +188,14 @@ export default function Explore() {
           <Navbar.Brand as={Link} to="/dashboard">CollegeHub</Navbar.Brand>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
-            <Nav className="ms-auto">
+            <Nav className="ms-auto align-items-center">
               <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
               <Nav.Link as={Link} to="/matchmaker">Matchmaker</Nav.Link>
               <Nav.Link as={Link} to="/explore" style={{ color: '#ffffff' }}>Explore</Nav.Link>
-              <Button
-                variant="outline-light"
-                size="sm"
-                onClick={handleLogout}
-                className="ms-2"
-              >
-                Logout
-              </Button>
+              <Nav.Link as={Link} to="/analyzer">Analysis</Nav.Link>
+              <div className="ms-2">
+                <ProfileDropdown />
+              </div>
             </Nav>
           </Navbar.Collapse>
         </Container>

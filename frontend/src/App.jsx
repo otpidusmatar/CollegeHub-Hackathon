@@ -3,12 +3,15 @@ import { useLocation, HashRouter as Router, Route, Routes, Navigate } from "reac
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FavoritesProvider } from './context/FavoritesContext';
+import { ProfileProvider } from './context/ProfileContext';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Matchmaker from './pages/Matchmaker';
 import Explore from './pages/Explore';
+import Profile from './pages/Profile';
+import CompetitivenessAnalyzer from './pages/CompetitivenessAnalyzer';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -60,6 +63,16 @@ function RouteContainer() {
           <Explore />
         </ProtectedRoute>
       } />
+      <Route path="/profile" element={
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      } />
+      <Route path="/analyzer" element={
+        <ProtectedRoute>
+          <CompetitivenessAnalyzer />
+        </ProtectedRoute>
+      } />
     </Routes>
   );
 }
@@ -71,9 +84,11 @@ function App() {
     <GoogleOAuthProvider clientId={clientId}>
       <AuthProvider>
         <FavoritesProvider>
-          <Router>
-            <RouteContainer />
-          </Router>
+          <ProfileProvider>
+            <Router>
+              <RouteContainer />
+            </Router>
+          </ProfileProvider>
         </FavoritesProvider>
       </AuthProvider>
     </GoogleOAuthProvider>
