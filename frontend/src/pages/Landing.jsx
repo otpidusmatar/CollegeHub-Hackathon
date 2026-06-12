@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import background from '../assets/oxford.jpg';
+import wakapiImage from '../assets/wakapi.png';
 import { Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -25,31 +26,31 @@ export default function Landing() {
   const [tokenUsage, setTokenUsage] = useState({
     labels: [
   'Matchmaker Questionnaires with AI Evaluation',
+  'Account System and AI Profiling',
   'AI Advisor System',
-  'Account System',
   'Web Design and Formatting',
   'College Data API System'
-],
-datasets: [{
-  label: 'Token Usage (%)',
-  data: [42.02, 32.89, 12.50, 11.21, 1.38],
-  backgroundColor: [
-    '#667eea',
-    '#764ba2',
-    '#f093fb',
-    '#4facfe',
-    '#00f2fe',
   ],
-  borderColor: [
-    '#667eea',
-    '#764ba2',
-    '#f093fb',
-    '#4facfe',
-    '#00f2fe',
-  ],
-  borderWidth: 2,
-}]
-  });
+  datasets: [{
+    label: 'Token Usage (%)',
+    data: [32.68, 31.95, 25.58, 8.72, 1.07],
+    backgroundColor: [
+      '#667eea',
+      '#764ba2',
+      '#f093fb',
+      '#4facfe',
+      '#00f2fe',
+    ],
+    borderColor: [
+      '#667eea',
+      '#764ba2',
+      '#f093fb',
+      '#4facfe',
+      '#00f2fe',
+    ],
+    borderWidth: 2,
+  }]
+    });
 
   const chartOptions = {
     responsive: true,
@@ -236,13 +237,13 @@ datasets: [{
                   </div>
                   <div className="mt-4 text-center">
                     <p className="text-muted mb-2">
-                      <strong>Total Bobcoins Used:</strong> <span className="text-primary">21.68</span>
+                      <strong>Total Bobcoins Used:</strong> <span className="text-primary">27.88</span>
                     </p>
                     <p className="text-muted mb-2">
-                      <strong>Monetary Equivalent:</strong> <span className="text-primary">$10.84, 54% of allocated resources</span>
+                      <strong>Monetary Equivalent:</strong> <span className="text-primary">$13.94, 70% of allocated resources</span>
                     </p>
                     <p className="text-muted mb-1">
-                      <strong>IBM Bob Prompts Sent:</strong> <span className="text-primary">38</span>
+                      <strong>IBM Bob Prompts Sent:</strong> <span className="text-primary">47</span>
                     </p>
                   </div>
                   <div className="mb-5">
@@ -287,7 +288,7 @@ datasets: [{
             </Col>
           </Row>
 
-          {/* Back to Top Button */}
+          {/* Back to Top Button
           <Row className="justify-content-center mt-5">
             <Col className="text-center">
               <Button
@@ -298,6 +299,50 @@ datasets: [{
               >
                 Back to Top ↑
               </Button>
+            </Col>
+          </Row> */}
+        </Container>
+      </div>
+
+      {/* Wakapi Section */}
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #360a87 0%, #03104a 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '80px 0'
+      }}>
+        <Container>
+          <Row className="justify-content-center">
+            <Col lg={10} className="text-center">
+              <h2 className="display-4 fw-bold text-white mb-5">
+                Development Analytics
+              </h2>
+              <Card className="shadow-lg border-0">
+                <Card.Body className="p-4">
+                  <img
+                    src={wakapiImage}
+                    alt="Wakapi Development Statistics"
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                      maxWidth: '100%',
+                      borderRadius: '8px'
+                    }}
+                  />
+                </Card.Body>
+              </Card>
+              <div className="mt-5">
+                <Button
+                  variant="light"
+                  size="lg"
+                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                  className="fw-semibold shadow"
+                >
+                  Back to Top ↑
+                </Button>
+              </div>
             </Col>
           </Row>
         </Container>
