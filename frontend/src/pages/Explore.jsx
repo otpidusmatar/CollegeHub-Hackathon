@@ -183,7 +183,7 @@ export default function Explore() {
 
   return (
     <>
-      <Navbar bg="dark" variant="dark" expand="lg">
+      <Navbar bg="dark" variant="dark" expand="lg" sticky="top">
         <Container>
           <Navbar.Brand as={Link} to="/dashboard">CollegeHub</Navbar.Brand>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
@@ -191,7 +191,7 @@ export default function Explore() {
             <Nav className="ms-auto">
               <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
               <Nav.Link as={Link} to="/matchmaker">Matchmaker</Nav.Link>
-              <Nav.Link as={Link} to="/explore">Explore</Nav.Link>
+              <Nav.Link as={Link} to="/explore" style={{ color: '#ffffff' }}>Explore</Nav.Link>
               <Button
                 variant="outline-light"
                 size="sm"

@@ -16,12 +16,68 @@ import {
   Alert,
   ProgressBar,
   ListGroup,
-  InputGroup
+  InputGroup,
+  OverlayTrigger,
+  Tooltip
 } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import aiService from '../services/aiService';
+
+// US States for multiselect dropdown
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' },
+  { code: 'AK', name: 'Alaska' },
+  { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' },
+  { code: 'CA', name: 'California' },
+  { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' },
+  { code: 'DE', name: 'Delaware' },
+  { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' },
+  { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' },
+  { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' },
+  { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' },
+  { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' },
+  { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' },
+  { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' },
+  { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' },
+  { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' },
+  { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' },
+  { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' },
+  { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' },
+  { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' },
+  { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' },
+  { code: 'WY', name: 'Wyoming' }
+];
 
 // Helper function to format Gemini's markdown-style text
 const formatGeminiText = (text) => {
@@ -160,6 +216,7 @@ export default function Matchmaker() {
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   
   // LLM Chat state
   const [showChat, setShowChat] = useState(false);
@@ -175,15 +232,12 @@ export default function Matchmaker() {
     // Location preferences
     preferredStates: [],
     preferredRegion: '',
-    locationImportance: 'medium',
     
     // Cost preferences
     maxTuition: '',
-    tuitionImportance: 'high',
     
     // Size preferences
     preferredSize: '',
-    sizeImportance: 'medium',
     
     // Academic preferences
     desiredPrograms: '',
@@ -193,17 +247,36 @@ export default function Matchmaker() {
     campusSetting: '',
     acceptanceRatePreference: '',
     
+    // AI preferences
+    useAI: true, // Default to true for enhanced recommendations
+    
     // Metadata
     questionnaireName: '',
     dateCompleted: ''
   });
 
+  // State for multiselect dropdown
+  const [showStateDropdown, setShowStateDropdown] = useState(false);
+  const stateDropdownRef = useRef(null);
+
   // College Scorecard API configuration
-  const API_KEY = 'uZqhM5FIsMThqsWvIviu2aL8AR2EC0Hpc214b6KN';
+  const API_KEY = import.meta.env.VITE_COLLEGE_API_KEY;
   const BASE_URL = 'https://api.data.gov/ed/collegescorecard/v1/schools';
 
   // AI Service (with Gemini/Groq fallback)
   const isAIConfigured = aiService.isConfigured();
+
+  // Handle clicks outside state dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (stateDropdownRef.current && !stateDropdownRef.current.contains(event.target)) {
+        setShowStateDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Load saved questionnaires from localStorage (user-specific)
   useEffect(() => {
@@ -298,6 +371,8 @@ export default function Matchmaker() {
 Return ONLY a valid JSON array of college names in the exact order they appear in the text.
 Include the full official name of each institution (e.g., "California Institute of Technology" not just "Caltech").
 If a college has a common abbreviation in parentheses like "California Institute of Technology (Caltech)", use the full name.
+This processed text will be used to import college data from the College Scorecard API, which accepts exact names only. 
+Be careful, when names like California Institute of Technology are mentioned, recommend the correct school, not a similar name like California Institute of Arts and Technology.
 
 Text to analyze:
 """
@@ -590,6 +665,7 @@ If no colleges are mentioned, return an empty array: []`;
       academicRigor: 'medium',
       campusSetting: '',
       acceptanceRatePreference: '',
+      useAI: true, // Default to true for enhanced recommendations
       questionnaireName: '',
       dateCompleted: ''
     });
@@ -631,45 +707,109 @@ If no colleges are mentioned, return an empty array: []`;
   const fetchRecommendations = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        api_key: API_KEY,
-        per_page: 20,
-        'fields': 'id,school.name,school.city,school.state,school.school_url,school.zip,latest.cost.tuition.in_state,latest.cost.tuition.out_of_state,latest.student.size,latest.admissions.admission_rate.overall,latest.academics.program_percentage,school.locale,school.region_id'
+      let allColleges = [];
+      
+      // If multiple states are selected, fetch for each state
+      const statesToFetch = responses.preferredStates.length > 0
+        ? responses.preferredStates
+        : ['']; // Empty string to fetch all states if none selected
+      
+      // Fetch colleges for each state
+      for (const state of statesToFetch) {
+        let page = 0;
+        let hasMorePages = true;
+        
+        while (hasMorePages) {
+          const params = new URLSearchParams({
+            api_key: API_KEY,
+            per_page: 100, // Maximum allowed by API
+            page: page,
+            'fields': 'id,school.name,school.city,school.state,school.school_url,school.zip,latest.cost.tuition.in_state,latest.cost.tuition.out_of_state,latest.student.size,latest.admissions.admission_rate.overall,latest.academics.program_percentage,school.locale,school.region_id'
+          });
+
+          // Apply state filter if specified
+          if (state) {
+            params.append('school.state', state);
+          }
+          
+          // Apply region filter if specified
+          if (responses.preferredRegion) {
+            params.append('school.region_id', responses.preferredRegion);
+          }
+          
+          // Apply tuition filter if specified
+          if (responses.maxTuition) {
+            params.append('latest.cost.tuition.in_state__range', `..${responses.maxTuition}`);
+          }
+          
+          // Apply size filter if specified
+          if (responses.preferredSize) {
+            params.append('latest.student.size__range', responses.preferredSize);
+          }
+
+          const response = await fetch(`${BASE_URL}?${params}`);
+          const data = await response.json();
+
+          if (data.results && data.results.length > 0) {
+            allColleges = [...allColleges, ...data.results];
+            
+            // Check if there are more pages
+            if (data.metadata && data.metadata.page < data.metadata.total - 1) {
+              page++;
+            } else {
+              hasMorePages = false;
+            }
+          } else {
+            hasMorePages = false;
+          }
+        }
+      }
+
+      // Remove duplicates (in case of overlapping results)
+      const uniqueColleges = Array.from(
+        new Map(allColleges.map(college => [college.id, college])).values()
+      );
+
+      // Apply client-side filtering for criteria not supported by API
+      let filteredColleges = uniqueColleges.filter(college => {
+        // Filter by acceptance rate preference
+        if (responses.acceptanceRatePreference && college['latest.admissions.admission_rate.overall']) {
+          const rate = college['latest.admissions.admission_rate.overall'];
+          if (responses.acceptanceRatePreference === 'high' && rate <= 0.5) return false;
+          if (responses.acceptanceRatePreference === 'medium' && (rate < 0.25 || rate > 0.5)) return false;
+          if (responses.acceptanceRatePreference === 'low' && rate >= 0.25) return false;
+        }
+        
+        // Filter by campus setting if specified
+        if (responses.campusSetting && college['school.locale']) {
+          const locale = college['school.locale'];
+          // Locale codes: 11-13 = City, 21-23 = Suburban, 31-33 = Town, 41-43 = Rural
+          if (responses.campusSetting === 'city' && (locale < 11 || locale > 13)) return false;
+          if (responses.campusSetting === 'suburban' && (locale < 21 || locale > 23)) return false;
+          if (responses.campusSetting === 'rural' && (locale < 41 || locale > 43)) return false;
+        }
+        
+        return true;
       });
 
-      // Apply filters based on responses
-      if (responses.preferredStates.length > 0) {
-        // API doesn't support multiple states directly, so we'll fetch for first state
-        params.append('school.state', responses.preferredStates[0]);
-      }
-      
-      if (responses.preferredRegion) {
-        params.append('school.region_id', responses.preferredRegion);
-      }
-      
-      if (responses.maxTuition) {
-        params.append('latest.cost.tuition.in_state__range', `..${responses.maxTuition}`);
-      }
-      
-      if (responses.preferredSize) {
-        params.append('latest.student.size__range', responses.preferredSize);
+      // Score and sort colleges based on all preferences
+      let scoredColleges = filteredColleges.map(college => ({
+        ...college,
+        matchScore: calculateMatchScore(college)
+      })).sort((a, b) => b.matchScore - a.matchScore);
+
+      // Enhance with AI-based program rigor scoring if programs are specified and AI is enabled
+      if (responses.desiredPrograms && responses.desiredPrograms.trim() && responses.useAI && isAIConfigured) {
+        scoredColleges = await enhanceRecommendationsWithAI(scoredColleges);
       }
 
-      const response = await fetch(`${BASE_URL}?${params}`);
-      const data = await response.json();
-
-      if (data.results) {
-        // Score and sort colleges based on preferences
-        const scoredColleges = data.results.map(college => ({
-          ...college,
-          matchScore: calculateMatchScore(college)
-        })).sort((a, b) => b.matchScore - a.matchScore);
-
-        setRecommendations(scoredColleges.slice(0, 10));
-      }
+      // Update state and return the results
+      setRecommendations(scoredColleges);
+      return scoredColleges;
     } catch (error) {
       console.error('Error fetching recommendations:', error);
       alert('Failed to fetch recommendations. Please try again.');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -680,37 +820,165 @@ If no colleges are mentioned, return an empty array: []`;
     let score = 0;
     let maxScore = 0;
 
-    // Location scoring
-    if (responses.locationImportance !== 'low') {
-      maxScore += responses.locationImportance === 'high' ? 30 : 20;
+    // Location scoring (states) - 25 points
+    if (responses.preferredStates.length > 0) {
+      maxScore += 25;
       if (responses.preferredStates.includes(college['school.state'])) {
-        score += responses.locationImportance === 'high' ? 30 : 20;
+        score += 25;
       }
     }
 
-    // Tuition scoring
-    if (responses.tuitionImportance !== 'low' && responses.maxTuition) {
-      maxScore += responses.tuitionImportance === 'high' ? 40 : 25;
+    // Region scoring - 10 points
+    if (responses.preferredRegion && college['school.region_id']) {
+      maxScore += 10;
+      if (college['school.region_id'].toString() === responses.preferredRegion) {
+        score += 10;
+      }
+    }
+
+    // Tuition scoring - 25 points
+    if (responses.maxTuition) {
+      maxScore += 25;
       const tuition = college['latest.cost.tuition.in_state'];
       if (tuition && tuition <= responses.maxTuition) {
         const tuitionRatio = 1 - (tuition / responses.maxTuition);
-        score += (responses.tuitionImportance === 'high' ? 40 : 25) * tuitionRatio;
+        score += 25 * tuitionRatio;
       }
     }
 
-    // Size scoring
-    if (responses.sizeImportance !== 'low' && responses.preferredSize) {
-      maxScore += responses.sizeImportance === 'high' ? 30 : 20;
+    // Size scoring - 15 points
+    if (responses.preferredSize) {
+      maxScore += 15;
       const size = college['latest.student.size'];
       if (size) {
         const [min, max] = responses.preferredSize.split('..').map(s => s ? parseInt(s) : null);
         if ((min === null || size >= min) && (max === null || size <= max)) {
-          score += responses.sizeImportance === 'high' ? 30 : 20;
+          score += 15;
         }
       }
     }
 
+    // Campus setting scoring
+    if (responses.campusSetting && college['school.locale']) {
+      maxScore += 10;
+      const locale = college['school.locale'];
+      let matches = false;
+      
+      if (responses.campusSetting === 'city' && locale >= 11 && locale <= 13) matches = true;
+      if (responses.campusSetting === 'suburban' && locale >= 21 && locale <= 23) matches = true;
+      if (responses.campusSetting === 'rural' && locale >= 41 && locale <= 43) matches = true;
+      
+      if (matches) score += 10;
+    }
+
+    // Academic rigor scoring (based on acceptance rate as proxy)
+    if (responses.academicRigor && college['latest.admissions.admission_rate.overall']) {
+      maxScore += 15;
+      const admissionRate = college['latest.admissions.admission_rate.overall'];
+      
+      if (responses.academicRigor === 'high' && admissionRate < 0.25) {
+        score += 15; // Highly selective schools
+      } else if (responses.academicRigor === 'medium' && admissionRate >= 0.25 && admissionRate <= 0.6) {
+        score += 15; // Moderately selective schools
+      } else if (responses.academicRigor === 'low' && admissionRate > 0.6) {
+        score += 15; // Less selective schools
+      }
+    }
+
+    // Acceptance rate preference scoring
+    if (responses.acceptanceRatePreference && college['latest.admissions.admission_rate.overall']) {
+      maxScore += 10;
+      const rate = college['latest.admissions.admission_rate.overall'];
+      
+      if (responses.acceptanceRatePreference === 'high' && rate > 0.5) {
+        score += 10;
+      } else if (responses.acceptanceRatePreference === 'medium' && rate >= 0.25 && rate <= 0.5) {
+        score += 10;
+      } else if (responses.acceptanceRatePreference === 'low' && rate < 0.25) {
+        score += 10;
+      }
+    }
+
+    // Programs/majors scoring (basic keyword matching if programs are specified)
+    if (responses.desiredPrograms && responses.desiredPrograms.trim()) {
+      maxScore += 10;
+      // This is a simplified scoring - in a real implementation, you'd want to
+      // match against actual program data from the API
+      // For now, we give partial credit to all schools
+      score += 5;
+    }
+
     return maxScore > 0 ? (score / maxScore) * 100 : 50;
+  };
+
+  // AI-enhanced program rigor scoring
+  const enhanceRecommendationsWithAI = async (colleges) => {
+    if (!responses.desiredPrograms || !responses.desiredPrograms.trim() || !isAIConfigured) {
+      return colleges;
+    }
+
+    try {
+      setLoading(true);
+      const prompt = `You are a college admissions expert. Given the following list of colleges and a student's desired programs/majors: "${responses.desiredPrograms}", analyze each college's strength and rigor in those specific programs.
+
+For each college, provide a program strength score from 0-20 based on:
+1. Reputation and ranking in the specified fields
+2. Research opportunities and facilities
+3. Faculty expertise
+4. Career outcomes for graduates in those programs
+
+Return ONLY a valid JSON array with this exact format:
+[
+  {"name": "College Name", "programScore": 15},
+  {"name": "Another College", "programScore": 18}
+]
+
+Colleges to analyze:
+${colleges.slice(0, 50).map(c => c['school.name']).join('\n')}`;
+
+      const response = await aiService.generateContent(prompt, { temperature: 0.3, maxTokens: 2000 });
+      
+      // Parse AI response
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        console.warn('AI response did not contain valid JSON array');
+        return colleges;
+      }
+
+      const programScores = JSON.parse(jsonMatch[0]);
+      
+      // Create a map of college names to scores
+      const scoreMap = new Map();
+      programScores.forEach(item => {
+        scoreMap.set(item.name.toLowerCase().trim(), item.programScore);
+      });
+
+      // Enhance colleges with program scores
+      const enhanced = colleges.map(college => {
+        const collegeName = college['school.name'].toLowerCase().trim();
+        const programScore = scoreMap.get(collegeName) || 0;
+        
+        // Recalculate match score with program component
+        const baseScore = college.matchScore;
+        const maxPossibleBase = 100;
+        const maxWithProgram = 120; // 100 base + 20 program
+        
+        const enhancedScore = ((baseScore + programScore) / maxWithProgram) * 100;
+        
+        return {
+          ...college,
+          matchScore: enhancedScore,
+          programScore: programScore
+        };
+      }).sort((a, b) => b.matchScore - a.matchScore);
+
+      return enhanced;
+    } catch (error) {
+      console.error('Error enhancing recommendations with AI:', error);
+      return colleges;
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Submit questionnaire
@@ -720,14 +988,17 @@ If no colleges are mentioned, return an empty array: []`;
       return;
     }
 
-    await fetchRecommendations();
+    setLoadingMessage('Processing your preferences with AI Matchmaker...');
+    const fetchedRecommendations = await fetchRecommendations();
 
+    // Save the AI-enhanced recommendations to avoid re-fetching
     const newQuestionnaire = {
       id: Date.now(),
       name: responses.questionnaireName,
       date: new Date().toISOString(),
       responses: { ...responses },
-      recommendations: []
+      recommendations: fetchedRecommendations, // Cache the AI-enhanced results
+      cachedAt: new Date().toISOString() // Track when results were cached
     };
 
     const updated = [newQuestionnaire, ...savedQuestionnaires];
@@ -736,6 +1007,7 @@ If no colleges are mentioned, return an empty array: []`;
     
     setShowQuestionnaire(false);
     setShowResults(true);
+    setLoadingMessage('');
   };
 
   // Delete questionnaire
@@ -750,9 +1022,31 @@ If no colleges are mentioned, return an empty array: []`;
   // View saved questionnaire
   const viewQuestionnaire = async (questionnaire) => {
     setResponses(questionnaire.responses);
-    setLoading(true);
-    await fetchRecommendations();
-    setShowResults(true);
+    
+    // Check if we have cached recommendations
+    if (questionnaire.recommendations && questionnaire.recommendations.length > 0) {
+      // Use cached results to avoid rate limiting
+      console.log('Using cached recommendations from:', questionnaire.cachedAt);
+      setRecommendations(questionnaire.recommendations);
+      setShowResults(true);
+    } else {
+      // No cache available, fetch fresh recommendations
+      setLoadingMessage('Loading your recommendations with AI Matchmaker...');
+      setLoading(true);
+      const fetchedRecommendations = await fetchRecommendations();
+      
+      // Update the questionnaire with the new recommendations
+      const updated = savedQuestionnaires.map(q =>
+        q.id === questionnaire.id
+          ? { ...q, recommendations: fetchedRecommendations, cachedAt: new Date().toISOString() }
+          : q
+      );
+      setSavedQuestionnaires(updated);
+      saveToLocalStorage(updated);
+      
+      setShowResults(true);
+      setLoadingMessage('');
+    }
   };
 
   // Format currency
@@ -797,32 +1091,88 @@ If no colleges are mentioned, return an empty array: []`;
           <div>
             <h4 className="mb-4">Step 1: Location Preferences</h4>
             
-            <Form.Group className="mb-4">
-              <Form.Label>Preferred States (Select all that apply)</Form.Label>
-              <Row>
-                {[
-                  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE',
-                  'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS',
-                  'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS',
-                  'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY',
-                  'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-                  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV',
-                  'WI', 'WY'
-                ].map(state => (
-                  <Col md={3} key={state} className="mb-2">
-                    <Form.Check
-                      type="checkbox"
-                      label={state}
-                      checked={responses.preferredStates.includes(state)}
-                      onChange={() => handleStateToggle(state)}
-                    />
-                  </Col>
-                ))}
-              </Row>
+            <Form.Group className="mb-4" ref={stateDropdownRef}>
+              <Form.Label>Preferred States (Select multiple)</Form.Label>
+              <div className="position-relative">
+                <Form.Control
+                  type="text"
+                  placeholder="Click to select states..."
+                  value={responses.preferredStates.length > 0
+                    ? `${responses.preferredStates.length} state${responses.preferredStates.length > 1 ? 's' : ''} selected`
+                    : 'No states selected'}
+                  onClick={() => setShowStateDropdown(!showStateDropdown)}
+                  readOnly
+                  style={{ cursor: 'pointer' }}
+                />
+                {showStateDropdown && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      maxHeight: '300px',
+                      overflowY: 'auto',
+                      backgroundColor: 'white',
+                      border: '1px solid #ced4da',
+                      borderRadius: '0.25rem',
+                      zIndex: 1000,
+                      marginTop: '2px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    <div style={{ padding: '0.5rem' }}>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => setResponses(prev => ({ ...prev, preferredStates: [] }))}
+                        style={{ padding: '0.25rem 0.5rem' }}
+                      >
+                        Clear All
+                      </Button>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => setResponses(prev => ({ ...prev, preferredStates: US_STATES.map(s => s.code) }))}
+                        style={{ padding: '0.25rem 0.5rem' }}
+                      >
+                        Select All
+                      </Button>
+                    </div>
+                    {US_STATES.map(state => (
+                      <div
+                        key={state.code}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          cursor: 'pointer',
+                          backgroundColor: responses.preferredStates.includes(state.code) ? '#e7f3ff' : 'white',
+                          borderBottom: '1px solid #f0f0f0'
+                        }}
+                        onClick={() => handleStateToggle(state.code)}
+                      >
+                        <Form.Check
+                          type="checkbox"
+                          label={`${state.name} (${state.code})`}
+                          checked={responses.preferredStates.includes(state.code)}
+                          onChange={() => {}}
+                          style={{ pointerEvents: 'none' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Form.Text className="text-muted">
+                {responses.preferredStates.length > 0 && (
+                  <div className="mt-2">
+                    Selected: {responses.preferredStates.join(', ')}
+                  </div>
+                )}
+              </Form.Text>
             </Form.Group>
 
             <Form.Group className="mb-4">
-              <Form.Label>Preferred Region</Form.Label>
+              <Form.Label>Preferred Region (Optional)</Form.Label>
               <Form.Select
                 value={responses.preferredRegion}
                 onChange={(e) => handleInputChange('preferredRegion', e.target.value)}
@@ -836,18 +1186,6 @@ If no colleges are mentioned, return an empty array: []`;
                 <option value="6">Southwest</option>
                 <option value="7">Rocky Mountains</option>
                 <option value="8">Far West</option>
-              </Form.Select>
-            </Form.Group>
-
-            <Form.Group className="mb-4">
-              <Form.Label>How important is location to you?</Form.Label>
-              <Form.Select
-                value={responses.locationImportance}
-                onChange={(e) => handleInputChange('locationImportance', e.target.value)}
-              >
-                <option value="low">Low - I'm flexible</option>
-                <option value="medium">Medium - Somewhat important</option>
-                <option value="high">High - Very important</option>
               </Form.Select>
             </Form.Group>
           </div>
@@ -867,20 +1205,8 @@ If no colleges are mentioned, return an empty array: []`;
                 onChange={(e) => handleInputChange('maxTuition', e.target.value)}
               />
               <Form.Text className="text-muted">
-                Leave blank if cost is not a limiting factor
+                Leave blank if cost is not a limiting factor. Schools within your budget will be prioritized in recommendations.
               </Form.Text>
-            </Form.Group>
-
-            <Form.Group className="mb-4">
-              <Form.Label>How important is tuition cost to you?</Form.Label>
-              <Form.Select
-                value={responses.tuitionImportance}
-                onChange={(e) => handleInputChange('tuitionImportance', e.target.value)}
-              >
-                <option value="low">Low - Cost is not a major concern</option>
-                <option value="medium">Medium - I'd like to keep costs reasonable</option>
-                <option value="high">High - Cost is a critical factor</option>
-              </Form.Select>
             </Form.Group>
           </div>
         );
@@ -900,18 +1226,6 @@ If no colleges are mentioned, return an empty array: []`;
                 <option value="0..2000">Small {'(<'} 2,000 students)</option>
                 <option value="2000..10000">Medium (2,000-10,000 students)</option>
                 <option value="10000..">Large {'(>'} 10,000 students)</option>
-              </Form.Select>
-            </Form.Group>
-
-            <Form.Group className="mb-4">
-              <Form.Label>How important is school size to you?</Form.Label>
-              <Form.Select
-                value={responses.sizeImportance}
-                onChange={(e) => handleInputChange('sizeImportance', e.target.value)}
-              >
-                <option value="low">Low - Size doesn't matter much</option>
-                <option value="medium">Medium - I have some preferences</option>
-                <option value="high">High - Size is very important</option>
               </Form.Select>
             </Form.Group>
 
@@ -994,6 +1308,42 @@ If no colleges are mentioned, return an empty array: []`;
               </Form.Text>
             </Form.Group>
 
+            {/* AI Enhancement Toggle */}
+            {isAIConfigured && responses.desiredPrograms && responses.desiredPrograms.trim() && (
+              <Form.Group className="mb-4">
+                <Card bg="light" className="border-primary">
+                  <Card.Body>
+                    <div className="d-flex align-items-start">
+                      <Form.Check
+                        type="switch"
+                        id="ai-toggle"
+                        checked={responses.useAI}
+                        onChange={(e) => handleInputChange('useAI', e.target.checked)}
+                        className="me-3"
+                        style={{ fontSize: '1.2rem' }}
+                      />
+                      <div className="flex-grow-1">
+                        <Form.Label htmlFor="ai-toggle" className="mb-2" style={{ cursor: 'pointer', fontWeight: 'bold' }}>
+                          Use AI-Enhanced Recommendations
+                        </Form.Label>
+                        <div className="text-muted small">
+                          <p className="mb-2">
+                            <strong>✨ AI Enhancement:</strong> Uses advanced AI to analyze program quality and match your academic interests more precisely.
+                          </p>
+                          <p className="mb-2">
+                            <strong>⚡ Performance:</strong> AI analysis is more thorough but takes longer to process (15-30 seconds).
+                          </p>
+                          <p className="mb-0">
+                            <strong>⚠️ Rate Limits:</strong> AI services may have usage limits. If you encounter rate limiting, try again later or disable this option.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Form.Group>
+            )}
+
             <Alert variant="info">
               <Alert.Heading>Review Your Preferences</Alert.Heading>
               <ul className="mb-0">
@@ -1001,6 +1351,9 @@ If no colleges are mentioned, return an empty array: []`;
                 <li><strong>Max Tuition:</strong> {responses.maxTuition ? formatCurrency(responses.maxTuition) : 'No limit'}</li>
                 <li><strong>School Size:</strong> {responses.preferredSize ? responses.preferredSize.replace('..', ' to ').replace('0', 'Under 2,000').replace('10000', 'Over 10,000') : 'No preference'}</li>
                 <li><strong>Programs:</strong> {responses.desiredPrograms || 'Not specified'}</li>
+                {isAIConfigured && responses.desiredPrograms && responses.desiredPrograms.trim() && (
+                  <li><strong>AI Enhancement:</strong> {responses.useAI ? 'Enabled ✨' : 'Disabled'}</li>
+                )}
               </ul>
             </Alert>
           </div>
@@ -1013,14 +1366,14 @@ If no colleges are mentioned, return an empty array: []`;
 
   return (
     <>
-      <Navbar bg="dark" variant="dark" expand="lg">
+      <Navbar bg="dark" variant="dark" expand="lg" sticky="top">
         <Container>
           <Navbar.Brand as={Link} to="/dashboard">CollegeHub</Navbar.Brand>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="ms-auto">
               <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
-              <Nav.Link as={Link} to="/matchmaker">Matchmaker</Nav.Link>
+              <Nav.Link as={Link} to="/matchmaker" style={{ color: '#ffffff' }}>Matchmaker</Nav.Link>
               <Nav.Link as={Link} to="/explore">Explore</Nav.Link>
               <Button
                 variant="outline-light"
@@ -1038,7 +1391,7 @@ If no colleges are mentioned, return an empty array: []`;
       <Container className="mt-4 mb-5">
         <h1 className="mb-4">College Matchmaker</h1>
         <p className="lead mb-4">
-          Find your perfect college match by answering a few questions about your preferences.
+          Find your perfect college match by answering a few questions about your preferences. 
         </p>
 
         {/* Start New Questionnaire and Chat Buttons */}
@@ -1110,10 +1463,67 @@ If no colleges are mentioned, return an empty array: []`;
           </Modal.Footer>
         </Modal>
 
+        {/* Loading Overlay Modal */}
+        <Modal
+          show={loading && loadingMessage}
+          backdrop="static"
+          keyboard={false}
+          centered
+        >
+          <Modal.Body className="text-center py-5">
+            <div className="mb-4">
+              <Spinner
+                animation="border"
+                role="status"
+                style={{
+                  width: '4rem',
+                  height: '4rem',
+                  borderWidth: '0.3rem',
+                  color: '#0d6efd'
+                }}
+              >
+                <span className="visually-hidden">Loading...</span>
+              </Spinner>
+            </div>
+            <h4 className="mb-3">
+              <i className="bi bi-stars me-2"></i>
+              AI Matchmaker at Work
+            </h4>
+            <p className="text-muted mb-0" style={{ fontSize: '1.1rem' }}>
+              {loadingMessage}
+            </p>
+            <div className="mt-4">
+              <div className="d-flex justify-content-center gap-2">
+                <div
+                  className="spinner-grow spinner-grow-sm text-primary"
+                  role="status"
+                  style={{ animationDelay: '0s' }}
+                >
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <div
+                  className="spinner-grow spinner-grow-sm text-primary"
+                  role="status"
+                  style={{ animationDelay: '0.2s' }}
+                >
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <div
+                  className="spinner-grow spinner-grow-sm text-primary"
+                  role="status"
+                  style={{ animationDelay: '0.4s' }}
+                >
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            </div>
+          </Modal.Body>
+        </Modal>
+
         {/* Results Modal */}
-        <Modal 
-          show={showResults} 
-          onHide={() => setShowResults(false)} 
+        <Modal
+          show={showResults}
+          onHide={() => setShowResults(false)}
           size="xl"
           scrollable
         >
@@ -1123,13 +1533,49 @@ If no colleges are mentioned, return an empty array: []`;
           <Modal.Body>
             {loading ? (
               <div className="text-center py-5">
-                <Spinner animation="border" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </Spinner>
-                <p className="mt-3">Finding your perfect matches...</p>
+                <div className="mb-4">
+                  <Spinner animation="border" role="status" variant="primary" style={{ width: '3rem', height: '3rem' }}>
+                    <span className="visually-hidden">Loading...</span>
+                  </Spinner>
+                </div>
+                <h5 className="mb-3">Finding your perfect matches...</h5>
+                <div className="d-flex justify-content-center gap-2 mb-3">
+                  <Spinner animation="grow" size="sm" variant="primary" />
+                  <Spinner animation="grow" size="sm" variant="primary" style={{ animationDelay: '0.2s' }} />
+                  <Spinner animation="grow" size="sm" variant="primary" style={{ animationDelay: '0.4s' }} />
+                </div>
+                <p className="text-muted">
+                  {responses.desiredPrograms && responses.desiredPrograms.trim() && isAIConfigured
+                    ? 'Analyzing colleges and evaluating program strengths with AI...'
+                    : 'Analyzing colleges based on your preferences...'}
+                </p>
               </div>
             ) : recommendations.length > 0 ? (
               <>
+                <Alert variant="info" className="mb-3">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <Alert.Heading as="h6">
+                        <i className="bi bi-info-circle me-2"></i>
+                        How Match % is Calculated
+                      </Alert.Heading>
+                      <small>
+                        Your match percentage is based on how well each college aligns with your preferences:
+                        <ul className="mb-0 mt-2" style={{ fontSize: '0.9em' }}>
+                          <li><strong>Location (25 pts):</strong> Preferred states match</li>
+                          <li><strong>Cost (25 pts):</strong> Within budget, with bonus for lower tuition</li>
+                          <li><strong>Size (15 pts):</strong> Matches your preferred student body size</li>
+                          <li><strong>Academic Rigor (15 pts):</strong> Selectivity aligns with your preference</li>
+                          <li><strong>Setting (10 pts):</strong> Urban, suburban, or rural preference</li>
+                          <li><strong>Region (10 pts):</strong> Geographic region preference</li>
+                          {responses.desiredPrograms && responses.desiredPrograms.trim() && isAIConfigured && (
+                            <li><strong>Program Strength (20 pts):</strong> AI-evaluated strength in your desired programs</li>
+                          )}
+                        </ul>
+                      </small>
+                    </div>
+                  </div>
+                </Alert>
                 <Alert variant="success">
                   <strong>Great news!</strong> We found {recommendations.length} colleges that match your preferences.
                 </Alert>
@@ -1159,6 +1605,16 @@ If no colleges are mentioned, return an empty array: []`;
                               </Badge>
                             </div>
                           </div>
+                          
+                          {college.programScore !== undefined && college.programScore > 0 && (
+                            <Alert variant="info" className="py-2 mb-2">
+                              <small>
+                                <strong>🎓 Program Strength:</strong> {college.programScore}/20 points
+                                <br />
+                                <em>AI-evaluated for your desired programs</em>
+                              </small>
+                            </Alert>
+                          )}
                           
                           <div className="mb-2">
                             <strong>📍 Location:</strong><br />
@@ -1468,9 +1924,18 @@ If no colleges are mentioned, return an empty array: []`;
                     <div className="d-flex justify-content-between align-items-center w-100 me-3">
                       <div>
                         <strong>{questionnaire.name}</strong>
+                        {questionnaire.recommendations && questionnaire.recommendations.length > 0 && (
+                          <Badge bg="success" className="ms-2">
+                            <i className="bi bi-check-circle me-1"></i>
+                            Cached
+                          </Badge>
+                        )}
                         <br />
                         <small className="text-muted">
                           Completed: {new Date(questionnaire.date).toLocaleDateString()}
+                          {questionnaire.cachedAt && (
+                            <> • Results cached: {new Date(questionnaire.cachedAt).toLocaleDateString()}</>
+                          )}
                         </small>
                       </div>
                     </div>
