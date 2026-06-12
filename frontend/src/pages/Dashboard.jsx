@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.css';
 import { Navbar, Nav, Container, Button, Card, Row, Col, Badge, ListGroup, Alert, Form, ProgressBar } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
@@ -9,6 +9,9 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { favorites, removeFavorite, toggleApplied, getAppliedCount } = useFavorites();
+  const [showAnalysisMode, setShowAnalysisMode] = useState(false);
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
 
   const handleLogout = () => {
     logout();
@@ -39,6 +42,53 @@ export default function Dashboard() {
   const applicationProgress = totalFavorites > 0 ? (appliedCount / totalFavorites) * 100 : 0;
   // Show red sliver if no colleges applied
   const showRedSliver = totalFavorites > 0 && appliedCount === 0;
+
+  // Sort favorites based on selected criteria
+  const getSortedFavorites = () => {
+    if (!favorites || favorites.length === 0) return [];
+    
+    const sorted = [...favorites].sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'name':
+          aValue = a['school.name'] || '';
+          bValue = b['school.name'] || '';
+          return sortOrder === 'asc'
+            ? aValue.localeCompare(bValue)
+            : bValue.localeCompare(aValue);
+        
+        case 'price':
+          aValue = a['latest.cost.tuition.in_state'] || 0;
+          bValue = b['latest.cost.tuition.in_state'] || 0;
+          return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+        
+        case 'acceptance':
+          aValue = a['latest.admissions.admission_rate.overall'] || 0;
+          bValue = b['latest.admissions.admission_rate.overall'] || 0;
+          return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+        
+        case 'size':
+          aValue = a['latest.student.size'] || 0;
+          bValue = b['latest.student.size'] || 0;
+          return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+        
+        case 'location':
+          aValue = `${a['school.state'] || ''} ${a['school.city'] || ''}`;
+          bValue = `${b['school.state'] || ''} ${b['school.city'] || ''}`;
+          return sortOrder === 'asc'
+            ? aValue.localeCompare(bValue)
+            : bValue.localeCompare(aValue);
+        
+        default:
+          return 0;
+      }
+    });
+    
+    return sorted;
+  };
+
+  const displayedFavorites = showAnalysisMode ? getSortedFavorites() : favorites;
 
   return (
     <>
@@ -97,10 +147,64 @@ export default function Dashboard() {
 
             {/* Favorites Section */}
             <div className="mt-4 pb-4">
-              <h3 className="mb-3">
-                ❤️ My Favorite Colleges
-                <Badge bg="secondary" className="ms-2">{favorites.length}</Badge>
-              </h3>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h3 className="mb-0">
+                  ❤️ My Favorite Colleges
+                  <Badge bg="secondary" className="ms-2">{favorites.length}</Badge>
+                </h3>
+                {showAnalysisMode && favorites.length > 0 && (
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={() => setShowAnalysisMode(false)}
+                  >
+                    Exit Analysis Mode
+                  </Button>
+                )}
+              </div>
+              
+              {/* Analysis Mode Controls */}
+              {showAnalysisMode && favorites.length > 0 && (
+                <Card className="shadow-sm mb-3 bg-light">
+                  <Card.Body>
+                    <Row className="align-items-center">
+                      <Col md={6}>
+                        <Form.Group>
+                          <Form.Label className="small fw-bold mb-1">Sort By</Form.Label>
+                          <Form.Select
+                            size="sm"
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                          >
+                            <option value="name">College Name</option>
+                            <option value="price">Tuition Price</option>
+                            <option value="acceptance">Acceptance Rate</option>
+                            <option value="size">Class Size</option>
+                            <option value="location">Location</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group>
+                          <Form.Label className="small fw-bold mb-1">Order</Form.Label>
+                          <Form.Select
+                            size="sm"
+                            value={sortOrder}
+                            onChange={(e) => setSortOrder(e.target.value)}
+                          >
+                            <option value="asc">
+                              {sortBy === 'name' || sortBy === 'location' ? 'A to Z' : 'Low to High'}
+                            </option>
+                            <option value="desc">
+                              {sortBy === 'name' || sortBy === 'location' ? 'Z to A' : 'High to Low'}
+                            </option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+              )}
               
               {favorites.length === 0 ? (
                 <Alert variant="info">
@@ -112,7 +216,7 @@ export default function Dashboard() {
               ) : (
                 <Card className="shadow-sm">
                   <ListGroup variant="flush">
-                    {favorites.map((college) => (
+                    {displayedFavorites.map((college) => (
                       <ListGroup.Item key={college.id} className="py-3">
                         <Row className="align-items-center">
                           <Col md={8}>
@@ -250,6 +354,29 @@ export default function Dashboard() {
                     <Badge bg="success" pill>Active</Badge>
                   </ListGroup.Item>
                 </ListGroup>
+              </Card.Body>
+            </Card>
+
+            <Card className="shadow-sm mt-3">
+              <Card.Body>
+                <Card.Title>📈 Favorite College Analysis</Card.Title>
+                <Card.Text className="small text-muted">
+                  Compare and analyze your favorite colleges by sorting them based on different criteria.
+                </Card.Text>
+                {favorites.length > 0 ? (
+                  <Button
+                    variant={showAnalysisMode ? "success" : "primary"}
+                    size="sm"
+                    className="w-100"
+                    onClick={() => setShowAnalysisMode(!showAnalysisMode)}
+                  >
+                    {showAnalysisMode ? '✓ Analysis Mode Active' : 'Enter Analysis Mode'}
+                  </Button>
+                ) : (
+                  <Alert variant="light" className="small mb-0 mt-2">
+                    Add colleges to your favorites to use analysis mode.
+                  </Alert>
+                )}
               </Card.Body>
             </Card>
 
