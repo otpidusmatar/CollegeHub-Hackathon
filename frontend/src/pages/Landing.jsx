@@ -4,6 +4,7 @@ import { Container, Button, Row, Col, Card, Alert } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
+import background from '../assets/oxford.jpg';
 
 export default function Landing() {
   const [error, setError] = useState('');
@@ -24,7 +25,12 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+    <div className="min-vh-100 d-flex align-items-center" style={{
+    backgroundImage: `url(${background})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  }}>
       <Container>
         <Row className="justify-content-center">
           <Col md={8} lg={6}>
